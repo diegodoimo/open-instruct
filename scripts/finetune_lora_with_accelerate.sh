@@ -15,15 +15,15 @@ accelerate launch \
     --use_deepspeed \
     --deepspeed_config_file ds_configs/stage3_no_offloading_accelerate.conf \
     open_instruct/finetune.py \
-    --model_name_or_path ../hf_llama2_models/${MODEL_SIZE} \
+    --model_name_or_path  /u/area/ddoimo/ddoimo/llama/llama_v2/models_hf/llama-2-7b \
     --use_flash_attn \
     --use_lora \
     --lora_rank 64 \
     --lora_alpha 16 \
     --lora_dropout 0.1 \
-    --tokenizer_name ../hf_llama2_models/${MODEL_SIZE} \
+    --tokenizer_name /u/area/ddoimo/ddoimo/llama/llama_v2/models_hf/llama-2-7b \
     --use_slow_tokenizer \
-    --train_file oasst1_data.jsonl \
+    --train_file /orfeo/cephfs/scratch/area/ddoimo/open-instruct/data/processed/lima/lima_data.jsonl \
     --max_seq_length 4096 \
     --preprocessing_num_workers 16 \
     --checkpointing_steps epoch \
