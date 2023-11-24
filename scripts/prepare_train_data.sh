@@ -1,3 +1,4 @@
+HF_TOKEN=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
 # check if there is $HF_TOKEN in the environment variables
 if [ -z "$HF_TOKEN" ]
 then

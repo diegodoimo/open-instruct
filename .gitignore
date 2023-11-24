@@ -1,4 +1,6 @@
 cuda-repo-*
+env_amd
+output
 
 results
 models

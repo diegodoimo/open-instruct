@@ -785,7 +785,8 @@ if __name__ == "__main__":
     all_funcs = [func_name for func_name in globals() if callable(globals()[func_name])]
     for func_name in all_funcs:
         if re.match(r"convert_.+_data", func_name):
-            supported_datasets.append(func_name[8:-5])
+            if func_name[8:-5] not in ["sharegpt"]:
+                supported_datasets.append(func_name[8:-5])
 
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("--raw_data_dir", type=str, default="data/downloads")
