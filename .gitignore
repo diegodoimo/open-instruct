@@ -1,6 +1,7 @@
 cuda-repo-*
 env_amd
 output
+slurm*
 
 results
 models
