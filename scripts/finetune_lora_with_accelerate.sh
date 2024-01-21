@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --partition=DGX
 #SBATCH --nodes=1
-#SBATCH --time=6:00:00            
+#SBATCH --time=24:00:00            
 #SBATCH --ntasks-per-node=1       
 #SBATCH --cpus-per-task=32           
-#SBATCH --mem=200G                
+#SBATCH --mem=80G                
 #SBATCH --job-name=test
 #SBATCH --gres=gpu:1 
 
@@ -19,7 +19,7 @@ export OMP_NUM_THREADS=32
 #export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 MODEL_SIZE=7B
-NUM_GPUS=4
+NUM_GPUS=1
 BATCH_SIZE_PER_GPU=1
 TOTAL_BATCH_SIZE=128
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
@@ -41,8 +41,8 @@ accelerate launch \
     --lora_dropout 0.1 \
     --tokenizer_name /u/area/ddoimo/ddoimo/llama/llama_v2/models_hf/llama-2-7b \
     --use_slow_tokenizer \
-    --train_file /orfeo/cephfs/scratch/area/ddoimo/open-instruct/data/processed/lima/lima_data.jsonl \
-    --max_seq_length 4096 \
+    --train_file /orfeo/cephfs/scratch/area/ddoimo/open-instruct/data/processed/dolly/dolly_data.jsonl \
+    --max_seq_length 2048 \
     --preprocessing_num_workers 16 \
     --checkpointing_steps epoch \
     --per_device_train_batch_size $BATCH_SIZE_PER_GPU \
@@ -51,7 +51,8 @@ accelerate launch \
     --lr_scheduler_type linear \
     --warmup_ratio 0.03 \
     --weight_decay 0. \
-    --num_train_epochs 1 \
+    --num_train_epochs 2 \
+    --eval_every 50 \
     --output_dir ./results/${MODEL_SIZE}_lora/ \
     --with_tracking \
     --report_to tensorboard \
