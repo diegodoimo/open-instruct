@@ -35,6 +35,8 @@ from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_tr
 
 from data_utils import get_mmlu_open_instruct, DataCollatorForCausalLM
 import numpy as np
+import sys
+
 
 logger = get_logger(__name__)
 
@@ -497,6 +499,9 @@ def main():
             "You can do it from another script, save it, and load it from here, using --tokenizer_name."
         )
 
+    print("tokenizer loaded. \n\n")
+    sys.stdout.flush()
+
     if args.model_name_or_path:
         if args.use_qlora:
             bnb_config = BitsAndBytesConfig(
@@ -529,6 +534,9 @@ def main():
         logger.info("Training new model from scratch")
         model = AutoModelForCausalLM.from_config(config)
 
+    print("model loaded. \n\n")
+    sys.stdout.flush()
+
     # no default pad token for llama!
     # here we add all special tokens again, because the default ones are not in the special_tokens_map
     if isinstance(tokenizer, LlamaTokenizer) or isinstance(
@@ -558,15 +566,14 @@ def main():
     elif isinstance(tokenizer, GPT2Tokenizer) and isinstance(model, OPTForCausalLM):
         num_added_tokens = tokenizer.add_special_tokens({"unk_token": "<unk>"})
 
-    
-
-
-
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.
     embedding_size = model.get_input_embeddings().weight.shape[0]
     if len(tokenizer) > embedding_size:
         model.resize_token_embeddings(len(tokenizer))
+
+    print("model embedding resized. \n\n")
+    sys.stdout.flush()
 
     if args.use_lora:
         if args.use_qlora:
