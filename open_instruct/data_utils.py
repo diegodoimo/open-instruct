@@ -15,9 +15,6 @@ from datasets.utils.logging import disable_progress_bar
 disable_progress_bar()
 
 IGNORE_INDEX = -100
-RANK = int(os.environ["RANK"])
-WORLD_SIZE = int(os.environ["WORLD_SIZE"])
-
 
 def format_subject(subject):
     l = subject.split("_")

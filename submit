@@ -1,5 +1,6 @@
 #!/bin/bash
 #SBATCH --partition=DGX
+#SBATCH --account=lade
 #SBATCH --nodes=1
 #SBATCH --time=6:00:00            
 #SBATCH --ntasks-per-node=1       
@@ -30,18 +31,17 @@ accelerate launch \
     --mixed_precision bf16 \
     --num_machines 1 \
     --num_processes $NUM_GPUS \
-    --use_deepspeed \
-    --deepspeed_config_file ds_configs/stage3_no_offloading_accelerate.conf \
     open_instruct/finetune.py \
-    --model_name_or_path  /u/area/ddoimo/ddoimo/llama/llama_v2/models_hf/llama-2-7b \
-    --use_flash_attn \
+    --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v1/models_hf/7B \
     --use_lora \
     --lora_rank 64 \
     --lora_alpha 16 \
     --lora_dropout 0.1 \
-    --tokenizer_name /u/area/ddoimo/ddoimo/llama/llama_v2/models_hf/llama-2-7b \
+    --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v1/models_hf/7B \
     --use_slow_tokenizer \
     --train_file /orfeo/cephfs/scratch/area/ddoimo/open-instruct/data/processed/lima/lima_data.jsonl \
+    --val_file /orfeo/cephfs/scratch/area/ddoimo/open-instruct/data/eval/mmlu \
+    --test_file /orfeo/cephfs/scratch/area/ddoimo/open-instruct/data/eval/mmlu \
     --max_seq_length 4096 \
     --preprocessing_num_workers 16 \
     --checkpointing_steps epoch \
@@ -62,3 +62,6 @@ python open_instruct/merge_lora.py \
     --lora_model_name_or_path $RESULTS_FOLDER \
     --output_dir ./results/${MODEL_SIZE}_lora_merged/ \
     --save_tokenizer
+#--use_deepspeed \
+#--deepspeed_config_file ds_configs/stage3_no_offloading_accelerate.conf \
+#--use_flash_attn \
