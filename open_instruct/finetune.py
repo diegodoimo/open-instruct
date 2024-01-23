@@ -541,12 +541,14 @@ def main():
             )
         else:
             print("model_loading started. \n\n")
+            print(config)
             sys.stdout.flush()
             model = AutoModelForCausalLM.from_pretrained(
                 args.model_name_or_path,
                 from_tf=bool(".ckpt" in args.model_name_or_path),
                 config=config,
                 low_cpu_mem_usage=args.low_cpu_mem_usage,
+                torch_dtype = torch.bfloat16,
                 use_flash_attention_2=True if args.use_flash_attn else False,
             )
             print("model loading finished. \n\n")
@@ -684,6 +686,10 @@ def main():
         ),
         batch_size=args.per_device_train_batch_size,
     )
+
+    batch = next(iter(train_dataloader))
+    assert batch["input_ids"].shape[0] ==1 
+
     val_dataset = get_mmlu_open_instruct(
         filepath=args.test_file,
         tokenizer=tokenizer,
@@ -885,9 +891,9 @@ def main():
             restrict_targets=True,
         )
         print(f"baseline average mmlu test accuracy: {acc:.4f}")
-
         print_memory_consumed()
         print("before after evaluate")
+
         model.train()
         total_loss = 0
         if (

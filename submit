@@ -21,8 +21,8 @@ export OMP_NUM_THREADS=32
 
 MODEL_SIZE=7B
 NUM_GPUS=1
-BATCH_SIZE_PER_GPU=1
 TOTAL_BATCH_SIZE=128
+BATCH_SIZE_PER_GPU=1
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 #echo "Training llama model ${MODEL_SIZE} using $NUM_GPUS GPUs, $BATCH_SIZE_PER_GPU batch size per GPU, $GRADIENT_ACC_STEPS gradient accumulation steps"
 
@@ -45,7 +45,7 @@ accelerate launch \
     --max_seq_length 1024 \
     --preprocessing_num_workers 16 \
     --checkpointing_steps epoch \
-    --per_device_train_batch_size $BATCH_SIZE_PER_GPU \
+    --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps $GRADIENT_ACC_STEPS \
     --learning_rate 1e-4 \
@@ -56,7 +56,8 @@ accelerate launch \
     --output_dir ./results/${MODEL_SIZE}_lora/ \
     --with_tracking \
     --report_to tensorboard \
-    --logging_steps 1 &&
+    --logging_steps 20 \
+    --eval_steps 50 &&
 
 python open_instruct/merge_lora.py \
     --base_model_name_or_path ../hf_llama2_models/${MODEL_SIZE} \
