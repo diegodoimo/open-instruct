@@ -36,7 +36,7 @@ from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_tr
 from data_utils import get_mmlu_open_instruct, DataCollatorForCausalLM
 import numpy as np
 import sys
-
+import time 
 
 logger = get_logger(__name__)
 
@@ -687,8 +687,8 @@ def main():
         batch_size=args.per_device_train_batch_size,
     )
 
-    batch = next(iter(train_dataloader))
-    assert batch["input_ids"].shape[0] ==1 
+    print(len(train_dataloader))
+
 
     val_dataset = get_mmlu_open_instruct(
         filepath=args.test_file,
@@ -835,9 +835,9 @@ def main():
     # logger.info(f"  Total optimization steps = {args.max_train_steps}")
 
     # Only show the progress bar once on each machine.
-    progress_bar = tqdm(
-        range(args.max_train_steps), disable=not accelerator.is_local_main_process
-    )
+    #progress_bar = tqdm(
+    #    range(args.max_train_steps), disable=not accelerator.is_local_main_process
+    #)
     completed_steps = 0
     starting_epoch = 0
 
@@ -907,7 +907,8 @@ def main():
             )
         else:
             active_dataloader = train_dataloader
-
+        print("tot iter:", len(active_dataloader))
+        start = time.time()
         for step, batch in enumerate(active_dataloader):
             with accelerator.accumulate(model):
                 outputs = model(**batch, use_cache=False)
@@ -924,17 +925,21 @@ def main():
 
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
-                progress_bar.update(1)
+                #progress_bar.update(1)
                 completed_steps += 1
                 if args.logging_steps and completed_steps % args.logging_steps == 0:
+                    t_tot = time.time() -start
+
                     avg_loss = (
                         accelerator.gather(total_loss).mean().item()
                         / args.gradient_accumulation_steps
                         / args.logging_steps
                     )
-                    logger.info(
-                        f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}"
+                    print(
+                            f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
                     )
+                    sys.stdout.flush()
+
                     if args.with_tracking:
                         accelerator.log(
                             {
@@ -945,31 +950,35 @@ def main():
                         )
                     total_loss = 0
                 if completed_steps % args.eval_steps == 0:
+                    t0 = time.time()
                     acc = evaluate(
                         model=model,
                         dataloader=val_loader,
                         tokenizer=tokenizer,
                         restrict_targets=True,
                     )
-                    print(f"baseline average mmlu val accuracy: {acc:.4f}")
+                    t1 = time.time()-t0
+                    t_tot -= t1
+                    print(f"baseline average mmlu val accuracy: {acc:.4f}, time {t1/60: .2f} min")
+                    sys.stdout.flush()
 
-                if isinstance(checkpointing_steps, int):
-                    if completed_steps % checkpointing_steps == 0:
-                        output_dir = f"step_{completed_steps}"
-                        if args.output_dir is not None:
-                            output_dir = os.path.join(args.output_dir, output_dir)
-                        save_with_accelerate(
-                            accelerator, model, tokenizer, output_dir, args
-                        )
+                #if isinstance(checkpointing_steps, int):
+                #    if completed_steps % checkpointing_steps == 0:
+                #        output_dir = f"step_{completed_steps}"
+                #        if args.output_dir is not None:
+                #            output_dir = os.path.join(args.output_dir, output_dir)
+                #        save_with_accelerate(
+                #            accelerator, model, tokenizer, output_dir, args
+                #        )
 
                 if completed_steps >= args.max_train_steps:
                     break
 
-        if args.checkpointing_steps == "epoch":
-            output_dir = f"epoch_{epoch}"
-            if args.output_dir is not None:
-                output_dir = os.path.join(args.output_dir, output_dir)
-            save_with_accelerate(accelerator, model, tokenizer, output_dir, args)
+        #if args.checkpointing_steps == "epoch":
+        #    output_dir = f"epoch_{epoch}"
+        #    if args.output_dir is not None:
+        #        output_dir = os.path.join(args.output_dir, output_dir)
+        #    save_with_accelerate(accelerator, model, tokenizer, output_dir, args)
 
     if args.with_tracking:
         accelerator.end_training()
