@@ -141,7 +141,13 @@ def parse_args():
     parser.add_argument(
         "--per_device_train_batch_size",
         type=int,
-        default=8,
+        default=1,
+        help="Batch size (per device) for the training dataloader.",
+    )
+    parser.add_argument(
+        "--per_device_eval_batch_size",
+        type=int,
+        default=1,
         help="Batch size (per device) for the training dataloader.",
     )
     parser.add_argument(
@@ -534,6 +540,8 @@ def main():
                 use_flash_attention_2=True if args.use_flash_attn else False,
             )
         else:
+            print("model_loading started. \n\n")
+            sys.stdout.flush()
             model = AutoModelForCausalLM.from_pretrained(
                 args.model_name_or_path,
                 from_tf=bool(".ckpt" in args.model_name_or_path),
@@ -541,6 +549,8 @@ def main():
                 low_cpu_mem_usage=args.low_cpu_mem_usage,
                 use_flash_attention_2=True if args.use_flash_attn else False,
             )
+            print("model loading finished. \n\n")
+            sys.stdout.flush()
     else:
         logger.info("Training new model from scratch")
         model = AutoModelForCausalLM.from_config(config)
@@ -613,6 +623,8 @@ def main():
         model.print_trainable_parameters()
 
     # Preprocessing the datasets.
+    print("start preprocessing the data. \n\n")
+    sys.stdout.flush()
     if (
         "prompt" in raw_datasets["train"].column_names
         and "completion" in raw_datasets["train"].column_names
@@ -646,16 +658,19 @@ def main():
             ],
             desc="Tokenizing and reformatting instruction data",
         )
+
         lm_datasets.set_format(type="pt")
         lm_datasets = lm_datasets.filter(
             lambda example: (example["labels"] != -100).any()
         )
 
     train_dataset = lm_datasets["train"]
+    print("finished preprocessing. \n\n")
+    sys.stdout.flush()
 
     # Log a few random samples from the training set:
-    for index in random.sample(range(len(train_dataset)), 3):
-        logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
+    # for index in random.sample(range(len(train_dataset)), 3):
+    #    logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
 
     # DataLoaders creation:
     train_dataloader = DataLoader(
@@ -665,7 +680,7 @@ def main():
         #     tokenizer=tokenizer, model=model, padding="longest"
         # ),
         collate_fn=DataCollatorForCausalLM(
-            tokenizer=tokenizer, max_seq_len=args.max_seq_len
+            tokenizer=tokenizer, max_seq_len=args.max_seq_length
         ),
         batch_size=args.per_device_train_batch_size,
     )
@@ -683,7 +698,7 @@ def main():
         val_dataset,
         shuffle=False,
         collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
-        batch_size=args.per_device_train_batch_size,
+        batch_size=args.per_device_eval_batch_size,
     )
 
     test_dataset = get_mmlu_open_instruct(
@@ -700,7 +715,7 @@ def main():
         test_dataset,
         shuffle=False,
         collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
-        batch_size=args.per_device_train_batch_size,
+        batch_size=args.per_device_eval_batch_size,
     )
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.
@@ -805,13 +820,14 @@ def main():
     # logger.info(f"  Num examples = {len(train_dataset)}")
     # logger.info(f"  Num Epochs = {args.num_train_epochs}")
     # logger.info(
-    #     f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
+    #    f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
     # )
     # logger.info(
-    #     f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
+    #    f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
     # )
     # logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
     # logger.info(f"  Total optimization steps = {args.max_train_steps}")
+
     # Only show the progress bar once on each machine.
     progress_bar = tqdm(
         range(args.max_train_steps), disable=not accelerator.is_local_main_process
@@ -854,21 +870,24 @@ def main():
             resume_step -= starting_epoch * len(train_dataloader)
 
     # update the progress_bar if load from checkpoint
-    progress_bar.update(completed_steps)
+    # progress_bar.update(completed_steps)
+
+    print("start training")
+    sys.stdout.flush()
 
     print_memory_consumed()
     print("before train run")
     for epoch in range(starting_epoch, args.num_train_epochs):
         acc = evaluate(
             model=model,
-            dataloader=test_loader,
+            dataloader=val_loader,
             tokenizer=tokenizer,
             restrict_targets=True,
         )
         print(f"baseline average mmlu test accuracy: {acc:.4f}")
-        print_memory_consumed()
-        print("after firs evaluation")
 
+        print_memory_consumed()
+        print("before after evaluate")
         model.train()
         total_loss = 0
         if (
@@ -960,7 +979,6 @@ def main():
 # @torch.inference_mode()
 @torch.no_grad()
 def evaluate(model, dataloader, tokenizer, restrict_targets):
-    print("evaluating mmlu")
     model.eval()
 
     predictions, ground_truths = [], []
@@ -973,19 +991,24 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
             for answer_choice in choices
         ]
 
+    print("evaluating mmlu")
+    sys.stdout.flush()
+
     for iter_num, batch in enumerate(dataloader):
         if (iter_num + 1) % int(1000 / dataloader.batch_size) == 0:
             print(
                 f"{iter_num * dataloader.batch_size}/ {len(dataloader.dataset)} inputs processed"
             )
+            sys.stdout.flush()
+
         input_ids, targets, mask = (
             batch["input_ids"],
             batch["labels"],
             batch["attention_mask"],
         )
         input_ids = input_ids.to("cuda")
-        # input_ids = fabric.to_device(input_ids.pin_memory())
-        logits = model(input_ids)
+        outputs = model(input_ids)
+        logits = outputs.logits
 
         seq_len = torch.sum(mask, dim=1)
         batch_probs = torch.softmax(
