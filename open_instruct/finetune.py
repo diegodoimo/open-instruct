@@ -287,6 +287,17 @@ def parse_args():
     return args
 
 
+def print_memory_consumed():
+    # rank = int(os.environ["RANK"])
+    torch.cuda.empty_cache()
+    allocated = torch.cuda.max_memory_allocated() / 2**30
+    reserved = torch.cuda.max_memory_reserved() / 2**30
+    # if rank == 0:
+    print(f"CUDA mem allocated: {allocated} GB")
+    print(f"CUDA mem reserved: {reserved} GB")
+    sys.stdout.flush()
+
+
 def encode_with_prompt_completion_format(example, tokenizer, max_seq_length):
     """
     Here we assume each example has 'prompt' and 'completion' fields.
@@ -790,17 +801,17 @@ def main():
         * args.gradient_accumulation_steps
     )
 
-    logger.info("***** Running training *****")
-    logger.info(f"  Num examples = {len(train_dataset)}")
-    logger.info(f"  Num Epochs = {args.num_train_epochs}")
-    logger.info(
-        f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
-    )
-    logger.info(
-        f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
-    )
-    logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
-    logger.info(f"  Total optimization steps = {args.max_train_steps}")
+    # logger.info("***** Running training *****")
+    # logger.info(f"  Num examples = {len(train_dataset)}")
+    # logger.info(f"  Num Epochs = {args.num_train_epochs}")
+    # logger.info(
+    #     f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
+    # )
+    # logger.info(
+    #     f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
+    # )
+    # logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
+    # logger.info(f"  Total optimization steps = {args.max_train_steps}")
     # Only show the progress bar once on each machine.
     progress_bar = tqdm(
         range(args.max_train_steps), disable=not accelerator.is_local_main_process
@@ -845,6 +856,8 @@ def main():
     # update the progress_bar if load from checkpoint
     progress_bar.update(completed_steps)
 
+    print_memory_consumed()
+    print("before train run")
     for epoch in range(starting_epoch, args.num_train_epochs):
         acc = evaluate(
             model=model,
@@ -853,6 +866,8 @@ def main():
             restrict_targets=True,
         )
         print(f"baseline average mmlu test accuracy: {acc:.4f}")
+        print_memory_consumed()
+        print("after firs evaluation")
 
         model.train()
         total_loss = 0
