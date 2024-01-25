@@ -1,0 +1,38 @@
+conda activate open_instruct
+TOTAL_BATCH_SIZE=4
+NUM_GPUS=1
+BATCH_SIZE_PER_GPU=1
+GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
+#echo "Training llama model ${MODEL_SIZE} using $NUM_GPUS GPUs, $BATCH_SIZE_PER_GPU batch size per GPU, $GRADIENT_ACC_STEPS gradient accumulation steps"
+
+# Lora training
+accelerate launch \
+    --num_machines 1 \
+    --num_processes 1 \
+    open_instruct/finetune.py \
+    --use_lora \
+    --lora_rank 64 \
+    --lora_alpha 16 \
+    --lora_dropout 0.1 \
+    --tokenizer_name /home/diego/area_science/ricerca/llama_analysis/hf_llama \
+    --use_slow_tokenizer \
+    --train_file "/home/diego/Documents/area_science/ricerca/finetuning_llm/final/data/open_instruct/processed/lima/lima_data.jsonl" \
+    --val_file "/home/diego/Documents/area_science/ricerca/finetuning_llm/final/data/open_instruct/eval/mmlu" \
+    --test_file "/home/diego/Documents/area_science/ricerca/finetuning_llm/final/data/open_instruct/eval/mmlu" \
+    --max_seq_length 1024 \
+    --preprocessing_num_workers 16 \
+    --checkpointing_steps epoch \
+    --per_device_train_batch_size $BATCH_SIZE_PER_GPU \
+    --per_device_eval_batch_size 4 \
+    --gradient_accumulation_steps $GRADIENT_ACC_STEPS \
+    --learning_rate 1e-4 \
+    --lr_scheduler_type linear \
+    --warmup_ratio 0.03 \
+    --weight_decay 0. \
+    --num_train_epochs 2 \
+    --output_dir ./results/run_laptop_lora/ \
+    --with_tracking \
+    --report_to tensorboard \
+    --logging_steps 20 \
+    --eval_steps 50
+
