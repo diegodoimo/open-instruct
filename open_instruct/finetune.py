@@ -921,10 +921,6 @@ def main():
         for step, batch in enumerate(active_dataloader):
             with accelerator.accumulate(model):
                 outputs = model(**batch, use_cache=False)
-                for name, weight in model.named_parameters():
-                    print(name)
-                    if weight.requires_grad:
-                        print(name)
                 loss = outputs.loss
                 # We keep track of the loss at each logged step
                 total_loss += loss.detach().float()
@@ -943,11 +939,11 @@ def main():
                 print("logits:", outputs.logits)
                 grad0 = model.base_model.model.model.layers[
                     0
-                ].self_attn.q_proj.lora_B.default.weight.grad
+                ].self_attn.q_proj.lora_A.default.weight.grad
                 print("grad: ", grad0)
                 grad1 = model.base_model.model.model.layers[
                     31
-                ].mlp.down_proj.lora_B.default.weight.grad1
+                ].mlp.down_proj.lora_B.default.weight.grad
 
                 print("out: ", grad1)
                 torch.save(
