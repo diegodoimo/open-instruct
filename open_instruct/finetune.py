@@ -916,7 +916,7 @@ def main():
             )
         else:
             active_dataloader = train_dataloader
-        print("tot iter:", len(active_dataloader))
+        # print("tot iter:", len(active_dataloader))
         start = time.time()
         for step, batch in enumerate(active_dataloader):
             with accelerator.accumulate(model):
@@ -925,8 +925,8 @@ def main():
                 # We keep track of the loss at each logged step
                 total_loss += loss.detach().float()
                 accelerator.backward(loss)
-                print("grad: ", model.model.model.embed_tokens.weight.grad)
-                print("out: ", model.model.lm_head.weight.grad)
+                # print("grad: ", model.model.model.embed_tokens.weight.grad)
+                # print("out: ", model.model.lm_head.weight.grad)
                 # clip gradient norm. don't do this with deepspeed
                 if accelerator.sync_gradients and args.clip_grad_norm > 0:
                     accelerator.clip_grad_norm_(model.parameters(), args.clip_grad_norm)
@@ -934,84 +934,83 @@ def main():
                 optimizer.zero_grad()
                 lr_scheduler.step()
 
+            # if accelerator.sync_gradients:
+            # print("input_ids:", batch["input_ids"])
+            # print("logits:", outputs.logits)
+            # grad0 = model.base_model.model.model.layers[
+            #     0
+            # ].self_attn.q_proj.lora_A.default.weight.grad
+            # print("grad: ", grad0)
+            # grad1 = model.base_model.model.model.layers[
+            #     31
+            # ].mlp.down_proj.lora_B.default.weight.grad
+
+            # print("out: ", grad1)
+            # torch.save(
+            #     batch["input_ids"].to("cpu"), f"{args.output_dir}/input_ids_hf"
+            # )
+            # torch.save(outputs.logits.to("cpu"), f"{args.output_dir}/logits_hf")
+            # torch.save(grad0.to("cpu"), f"{args.output_dir}/lorab_in_hf")
+            # torch.save(grad1.to("cpu"), f"{args.output_dir}/lorab_out_hf")
+
+            # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
-                print("input_ids:", batch["input_ids"])
-                print("logits:", outputs.logits)
-                grad0 = model.base_model.model.model.layers[
-                    0
-                ].self_attn.q_proj.lora_A.default.weight.grad
-                print("grad: ", grad0)
-                grad1 = model.base_model.model.model.layers[
-                    31
-                ].mlp.down_proj.lora_B.default.weight.grad
+                # progress_bar.update(1)
+                completed_steps += 1
+                if args.logging_steps and completed_steps % args.logging_steps == 0:
+                    t_tot = time.time() - start
 
-                print("out: ", grad1)
-                torch.save(
-                    batch["input_ids"].to("cpu"), f"{args.output_dir}/input_ids_hf"
-                )
-                torch.save(outputs.logits.to("cpu"), f"{args.output_dir}/logits_hf")
-                torch.save(grad0.to("cpu"), f"{args.output_dir}/lorab_in_hf")
-                torch.save(grad1.to("cpu"), f"{args.output_dir}/lorab_out_hf")
-                assert False
+                    avg_loss = (
+                        accelerator.gather(total_loss).mean().item()
+                        / args.gradient_accumulation_steps
+                        / args.logging_steps
+                    )
+                    print(
+                        f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
+                    )
+                    sys.stdout.flush()
 
-    #         # Checks if the accelerator has performed an optimization step behind the scenes
-    #         if accelerator.sync_gradients:
-    #             # progress_bar.update(1)
-    #             completed_steps += 1
-    #             if args.logging_steps and completed_steps % args.logging_steps == 0:
-    #                 t_tot = time.time() - start
+                    if args.with_tracking:
+                        accelerator.log(
+                            {
+                                "learning_rate": lr_scheduler.get_last_lr()[0],
+                                "train_loss": avg_loss,
+                            },
+                            step=completed_steps,
+                        )
+                    total_loss = 0
+                if completed_steps % args.eval_steps == 0:
+                    t0 = time.time()
+                    acc = evaluate(
+                        model=model,
+                        dataloader=val_loader,
+                        tokenizer=tokenizer,
+                        restrict_targets=True,
+                    )
+                    t1 = time.time() - t0
+                    t_tot -= t1
+                    print(
+                        f"baseline average mmlu val accuracy: {acc:.4f}, time {t1/60: .2f} min"
+                    )
+                    sys.stdout.flush()
 
-    #                 avg_loss = (
-    #                     accelerator.gather(total_loss).mean().item()
-    #                     / args.gradient_accumulation_steps
-    #                     / args.logging_steps
-    #                 )
-    #                 print(
-    #                     f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
-    #                 )
-    #                 sys.stdout.flush()
+                # if isinstance(checkpointing_steps, int):
+                #    if completed_steps % checkpointing_steps == 0:
+                #        output_dir = f"step_{completed_steps}"
+                #        if args.output_dir is not None:
+                #            output_dir = os.path.join(args.output_dir, output_dir)
+                #        save_with_accelerate(
+                #            accelerator, model, tokenizer, output_dir, args
+                #        )
 
-    #                 if args.with_tracking:
-    #                     accelerator.log(
-    #                         {
-    #                             "learning_rate": lr_scheduler.get_last_lr()[0],
-    #                             "train_loss": avg_loss,
-    #                         },
-    #                         step=completed_steps,
-    #                     )
-    #                 total_loss = 0
-    #             if completed_steps % args.eval_steps == 0:
-    #                 t0 = time.time()
-    #                 acc = evaluate(
-    #                     model=model,
-    #                     dataloader=val_loader,
-    #                     tokenizer=tokenizer,
-    #                     restrict_targets=True,
-    #                 )
-    #                 t1 = time.time() - t0
-    #                 t_tot -= t1
-    #                 print(
-    #                     f"baseline average mmlu val accuracy: {acc:.4f}, time {t1/60: .2f} min"
-    #                 )
-    #                 sys.stdout.flush()
+                if completed_steps >= args.max_train_steps:
+                    break
 
-    #             # if isinstance(checkpointing_steps, int):
-    #             #    if completed_steps % checkpointing_steps == 0:
-    #             #        output_dir = f"step_{completed_steps}"
-    #             #        if args.output_dir is not None:
-    #             #            output_dir = os.path.join(args.output_dir, output_dir)
-    #             #        save_with_accelerate(
-    #             #            accelerator, model, tokenizer, output_dir, args
-    #             #        )
-
-    #             if completed_steps >= args.max_train_steps:
-    #                 break
-
-    #     # if args.checkpointing_steps == "epoch":
-    #     #    output_dir = f"epoch_{epoch}"
-    #     #    if args.output_dir is not None:
-    #     #        output_dir = os.path.join(args.output_dir, output_dir)
-    #     #    save_with_accelerate(accelerator, model, tokenizer, output_dir, args)
+        # if args.checkpointing_steps == "epoch":
+        #    output_dir = f"epoch_{epoch}"
+        #    if args.output_dir is not None:
+        #        output_dir = os.path.join(args.output_dir, output_dir)
+        #    save_with_accelerate(accelerator, model, tokenizer, output_dir, args)
 
     # if args.with_tracking:
     #     accelerator.end_training()
