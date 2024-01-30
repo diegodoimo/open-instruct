@@ -924,6 +924,44 @@ def main():
                 loss = outputs.loss
                 # We keep track of the loss at each logged step
                 total_loss += loss.detach().float()
+
+                print("loss:", loss)
+
+                print(
+                    "h31_loraA: ",
+                    model.base_model.model.model.layers[
+                        31
+                    ].self_attn.q_proj.lora_A.default.weight.grad,
+                )
+                print(
+                    "h31s_loraB: ",
+                    model.base_model.model.model.layers[
+                        31
+                    ].self_attn.q_proj.lora_B.default.weight.grad,
+                )
+                print(
+                    "h0_loraA: ",
+                    model.base_model.model.model.layers[
+                        0
+                    ].self_attn.q_proj.lora_A.default.weight.grad,
+                )
+                print(
+                    "h0_loraB: ",
+                    model.base_model.model.model.layers[
+                        0
+                    ].self_attn.q_proj.lora_B.default.weight.grad,
+                )
+
+                # print("input_ids:", batch["input_ids"])
+                # print("logits:", outputs.logits)
+                # grad0 = model.base_model.model.model.layers[
+                #     0
+                # ].self_attn.q_proj.lora_A.default.weight.grad
+                # print("grad: ", grad0)
+                # grad1 = model.base_model.model.model.layers[
+                #     0
+                # ].mlp.down_proj.lora_B.default.weight.grad
+
                 accelerator.backward(loss)
                 # print("grad: ", model.model.model.embed_tokens.weight.grad)
                 # print("out: ", model.model.lm_head.weight.grad)
@@ -933,6 +971,32 @@ def main():
                 optimizer.step()
                 optimizer.zero_grad()
                 lr_scheduler.step()
+
+                print("after optimizer step")
+                print(
+                    "h31_loraA: ",
+                    model.base_model.model.model.layers[
+                        31
+                    ].self_attn.q_proj.lora_A.default.weight.grad,
+                )
+                print(
+                    "h31s_loraB: ",
+                    model.base_model.model.model.layers[
+                        31
+                    ].self_attn.q_proj.lora_B.default.weight.grad,
+                )
+                print(
+                    "h0_loraA: ",
+                    model.base_model.model.model.layers[
+                        0
+                    ].self_attn.q_proj.lora_A.default.weight.grad,
+                )
+                print(
+                    "h0_loraB: ",
+                    model.base_model.model.model.layers[
+                        0
+                    ].self_attn.q_proj.lora_B.default.weight.grad,
+                )
 
             # if accelerator.sync_gradients:
             # print("input_ids:", batch["input_ids"])
@@ -955,6 +1019,7 @@ def main():
 
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
+                assert False
                 # progress_bar.update(1)
                 completed_steps += 1
                 if args.logging_steps and completed_steps % args.logging_steps == 0:
