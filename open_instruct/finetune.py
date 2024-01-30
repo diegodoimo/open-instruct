@@ -893,15 +893,15 @@ def main():
     print_memory_consumed()
     print("before train run")
     for epoch in range(starting_epoch, args.num_train_epochs):
-        # acc = evaluate(
-        #     model=model,
-        #     dataloader=test_loader,
-        #     tokenizer=tokenizer,
-        #     restrict_targets=True,
-        # )
-        # print(f"baseline average mmlu test accuracy: {acc:.4f}")
-        # print_memory_consumed()
-        # print("before after evaluate")
+        acc = evaluate(
+             model=model,
+             dataloader=test_loader,
+             tokenizer=tokenizer,
+            restrict_targets=True,
+        )
+        print(f"baseline average mmlu test accuracy: {acc:.4f}")
+        print_memory_consumed()
+        print("before after evaluate")
 
         model.train()
         total_loss = 0
