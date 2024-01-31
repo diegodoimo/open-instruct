@@ -635,6 +635,30 @@ def main():
 
     # for name, param in model.named_parameters():
     #     print(name)
+    #     if param.requires_grad:
+    #         print(name)
+
+    def bp_hooks(model, names):
+        def get_hook(name):
+            def hook_fn(model, grad_input, grad_output):
+                torch.save(grad_input, f"./results/{name}_grad_input_hf.pt")
+                torch.save(grad_output, f"./results/{name}_grad_output_hf.pt")
+                print(f"grad_output {name}", grad_output)
+                print(f"grad_input {name}", grad_input)
+
+            return hook_fn
+
+        for name, module in model.named_modules():
+            if name in names:
+                module.register_full_backward_hook(get_hook(name))
+
+    names = [
+        "base_model.model.lm_head",
+        "base_model.model.model.norm",
+        # "_forward_module.transformer.h.2.mlp.proj.lora_B",
+        # "_forward_module.transformer.h.2.mlp.proj.lora_A",
+    ]
+    bp_hooks(model, names)
 
     # Preprocessing the datasets.
     print("start preprocessing the data. \n\n")
