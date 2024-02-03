@@ -644,11 +644,9 @@ def main():
     def bp_hooks(model, names):
         def get_hook(name):
             def hook_fn(model, grad_input, grad_output):
-                torch.save(grad_input, f"./results/{name}_grad_input_hf.pt")
-                torch.save(grad_output, f"./results/{name}_grad_output_hf.pt")
-                print(f"grad_output {name}", grad_output)
-                print(f"grad_input {name}", grad_input)
-
+                #torch.save(grad_input, f"./results/{name}_grad_input_hf.pt")
+                #torch.save(grad_output, f"./results/{name}_grad_output_hf.pt")
+                x =1
             return hook_fn
 
         for name, module in model.named_modules():
@@ -952,38 +950,12 @@ def main():
                 # We keep track of the loss at each logged step
                 total_loss += loss.detach().float()
 
-                print("loss:", loss)
+                #print("loss:", loss)
+                print("input_ids:", batch["input_ids"])
+                #print("input_ids_shape:", batch["input_ids"].shape)
 
-                print(
-                    "h31_loraA: ",
-                    model.base_model.model.model.layers[
-                        31
-                    ].self_attn.q_proj.lora_A.default.weight.grad,
-                )
-                print(
-                    "h31s_loraB: ",
-                    model.base_model.model.model.layers[
-                        31
-                    ].self_attn.q_proj.lora_B.default.weight.grad,
-                )
-                print(
-                    "h0_loraA: ",
-                    model.base_model.model.model.layers[
-                        0
-                    ].self_attn.q_proj.lora_A.default.weight.grad,
-                )
-                print(
-                    "h0_loraB: ",
-                    model.base_model.model.model.layers[
-                        0
-                    ].self_attn.q_proj.lora_B.default.weight.grad,
-                )
 
-                # print("input_ids:", batch["input_ids"])
-                # print("logits:", outputs.logits)
-                # grad0 = model.base_model.model.model.layers[
-                #     0
-                # ].self_attn.q_proj.lora_A.default.weight.grad
+                #torch.save(w0, f"./results/key_weight_iter{step}_hf.pt")
                 # print("grad: ", grad0)
                 # grad1 = model.base_model.model.model.layers[
                 #     0
@@ -991,7 +963,7 @@ def main():
 
                 accelerator.backward(loss)
                 # print("grad: ", model.model.model.embed_tokens.weight.grad)
-                # print("out: ", model.model.lm_head.weight.grad)
+                #torch.save(model.model.lm_head.weight.grad, "./results/lm_head_grad_hf_first.pt")
                 # clip gradient norm. don't do this with deepspeed
                 if accelerator.sync_gradients and args.clip_grad_norm > 0:
                     accelerator.clip_grad_norm_(model.parameters(), args.clip_grad_norm)
@@ -999,31 +971,6 @@ def main():
                 optimizer.zero_grad()
                 lr_scheduler.step()
 
-                print("after optimizer step")
-                print(
-                    "h31_loraA: ",
-                    model.base_model.model.model.layers[
-                        31
-                    ].self_attn.q_proj.lora_A.default.weight.grad,
-                )
-                print(
-                    "h31s_loraB: ",
-                    model.base_model.model.model.layers[
-                        31
-                    ].self_attn.q_proj.lora_B.default.weight.grad,
-                )
-                print(
-                    "h0_loraA: ",
-                    model.base_model.model.model.layers[
-                        0
-                    ].self_attn.q_proj.lora_A.default.weight.grad,
-                )
-                print(
-                    "h0_loraB: ",
-                    model.base_model.model.model.layers[
-                        0
-                    ].self_attn.q_proj.lora_B.default.weight.grad,
-                )
 
             # if accelerator.sync_gradients:
             # print("input_ids:", batch["input_ids"])
