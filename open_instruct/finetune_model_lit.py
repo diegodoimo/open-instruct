@@ -506,18 +506,18 @@ def main():
         )
 
     # Load pretrained model and tokenizer
-    if args.config_name:
-        config = AutoConfig.from_pretrained(args.config_name)
-    elif args.model_name_or_path:
-        config = AutoConfig.from_pretrained(args.model_name_or_path)
-    else:
-        warnings.warn("Using a fake llama for debugging\n", stacklevel=2)
-        config = LlamaConfig()
-        config.intermediate_size = 1000
-        config.num_hidden_layers = 3
-        config.num_attention_heads = 2
-        config.num_key_value_heads = 2
-        config.hidden_size = 500
+    #if args.config_name:
+    #    config = AutoConfig.from_pretrained(args.config_name)
+    #elif args.model_name_or_path:
+    #    config = AutoConfig.from_pretrained(args.model_name_or_path)
+    #else:
+    #    warnings.warn("Using a fake llama for debugging\n", stacklevel=2)
+    #    config = LlamaConfig()
+    #    config.intermediate_size = 1000
+    #    config.num_hidden_layers = 3
+    #    config.num_attention_heads = 2
+    #    config.num_key_value_heads = 2
+    #    config.hidden_size = 500
         # raise ValueError(
         #     "You are instantiating a new config instance from scratch. This is not supported by this script."
         # )
