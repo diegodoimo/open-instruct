@@ -40,6 +40,17 @@ import sys
 import time
 import warnings
 
+
+from lit_gpt.lora import GPT, Block, Config, lora_filter, mark_only_lora_as_trainable
+from lit_gpt.utils import (
+    chunked_cross_entropy,
+    get_default_supported_precision,
+    load_checkpoint,
+    num_parameters,
+    update_config,
+)
+
+
 logger = get_logger(__name__)
 
 
@@ -528,43 +539,105 @@ def main():
     print("tokenizer loaded. \n\n")
     sys.stdout.flush()
 
-    if args.model_name_or_path:
-        if args.use_qlora:
-            bnb_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_use_double_quant=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.bfloat16,
-            )
-            device_index = accelerator.local_process_index
-            device_map = {"": device_index}  # force data-parallel training.
-            model = AutoModelForCausalLM.from_pretrained(
-                args.model_name_or_path,
-                from_tf=bool(".ckpt" in args.model_name_or_path),
-                config=config,
-                load_in_4bit=True,
-                quantization_config=bnb_config,
-                device_map=device_map,
-                torch_dtype=torch.bfloat16,
-                use_flash_attention_2=True if args.use_flash_attn else False,
-            )
-        else:
-            print("model_loading started. \n\n")
-            print(config)
-            sys.stdout.flush()
-            model = AutoModelForCausalLM.from_pretrained(
-                args.model_name_or_path,
-                from_tf=bool(".ckpt" in args.model_name_or_path),
-                config=config,
-                low_cpu_mem_usage=args.low_cpu_mem_usage,
-                torch_dtype=torch.bfloat16,
-                use_flash_attention_2=True if args.use_flash_attn else False,
-            )
-            print("model loading finished. \n\n")
-            sys.stdout.flush()
-    else:
-        logger.info("Training new model from scratch")
-        model = AutoModelForCausalLM.from_config(config)
+    # if args.model_name_or_path:
+    #     if args.use_qlora:
+    #         bnb_config = BitsAndBytesConfig(
+    #             load_in_4bit=True,
+    #             bnb_4bit_use_double_quant=True,
+    #             bnb_4bit_quant_type="nf4",
+    #             bnb_4bit_compute_dtype=torch.bfloat16,
+    #         )
+    #         device_index = accelerator.local_process_index
+    #         device_map = {"": device_index}  # force data-parallel training.
+    #         model = AutoModelForCausalLM.from_pretrained(
+    #             args.model_name_or_path,
+    #             from_tf=bool(".ckpt" in args.model_name_or_path),
+    #             config=config,
+    #             load_in_4bit=True,
+    #             quantization_config=bnb_config,
+    #             device_map=device_map,
+    #             torch_dtype=torch.bfloat16,
+    #             use_flash_attention_2=True if args.use_flash_attn else False,
+    #         )
+    #     else:
+    #         print("model_loading started. \n\n")
+    #         print(config)
+    #         sys.stdout.flush()
+    #         model = AutoModelForCausalLM.from_pretrained(
+    #             args.model_name_or_path,
+    #             from_tf=bool(".ckpt" in args.model_name_or_path),
+    #             config=config,
+    #             low_cpu_mem_usage=args.low_cpu_mem_usage,
+    #             torch_dtype=torch.bfloat16,
+    #             use_flash_attention_2=True if args.use_flash_attn else False,
+    #         )
+    #         print("model loading finished. \n\n")
+    #         sys.stdout.flush()
+    # else:
+    #     logger.info("Training new model from scratch")
+    #     model = AutoModelForCausalLM.from_config(config)
+
+    # if args.use_lora:
+    #     if args.use_qlora:
+    #         model = prepare_model_for_kbit_training(
+    #             model, use_gradient_checkpointing=args.gradient_checkpointing
+    #         )
+
+    #     logger.info("Initializing LORA model...")
+    #     peft_config = LoraConfig(
+    #         task_type=TaskType.CAUSAL_LM,
+    #         inference_mode=False,
+    #         r=args.lora_rank,
+    #         lora_alpha=args.lora_alpha,
+    #         lora_dropout=args.lora_dropout,
+    #         target_modules=[
+    #             "q_proj",
+    #             "o_proj",
+    #             "v_proj",
+    #             "k_proj",
+    #             "gate_proj",
+    #             "up_proj",
+    #             "down_proj",
+    #         ],
+    #     )
+    #     model = get_peft_model(model, peft_config)
+    #     model.print_trainable_parameters()
+
+    mine_to_lit = {
+        "laptop_llama": "laptop_llama",
+        "llama-1-7b": "Llama-1-7b-hf",
+        "llama-1-13b": "Llama-1-13b-hf",
+        "llama-1-30b": "Llama-1-30b-hf",
+        "llama-1-65b": "Llama-1-65b-hf",
+        "llama-2-7b": "Llama-2-7b-hf",
+        "llama-2-13b": "Llama-2-13b-hf",
+        "llama-2-70b": "Llama-2-70b-hf",
+        "llama-2-7b-chat": "Llama-2-7b-chat-hf",
+        "llama-2-13b-chat": "Llama-2-13b-chat-hf",
+        "llama-2-70b-chat": "Llama-2-70b-chat-hf",
+    }
+
+    model_name = mine_to_lit[args.model_name_or_path.split("/")[-1]]
+
+    config = Config.from_name(
+        name=model_name,
+        r=args.lora_rank,
+        alpha=args.lora_alpha,
+        dropout=args.lora_dropout,
+        to_query=True,
+        to_key=True,
+        to_value=True,
+        to_projection=True,
+        to_mlp=True,
+        to_head=False,
+    )
+
+    model = GPT(config)
+    mark_only_lora_as_trainable(model)
+
+    print(
+        f"Number of trainable parameters: {num_parameters(model, requires_grad=True):,}"
+    )
 
     print("model loaded. \n\n")
     sys.stdout.flush()
@@ -609,32 +682,6 @@ def main():
 
     # tokenizer.pad_token = "<pad>"
     tokenizer.pad_token_id = tokenizer.eos_token_id
-
-    if args.use_lora:
-        if args.use_qlora:
-            model = prepare_model_for_kbit_training(
-                model, use_gradient_checkpointing=args.gradient_checkpointing
-            )
-
-        logger.info("Initializing LORA model...")
-        peft_config = LoraConfig(
-            task_type=TaskType.CAUSAL_LM,
-            inference_mode=False,
-            r=args.lora_rank,
-            lora_alpha=args.lora_alpha,
-            lora_dropout=args.lora_dropout,
-            target_modules=[
-                "q_proj",
-                "o_proj",
-                "v_proj",
-                "k_proj",
-                "gate_proj",
-                "up_proj",
-                "down_proj",
-            ],
-        )
-        model = get_peft_model(model, peft_config)
-        model.print_trainable_parameters()
 
     # for name, param in model.named_parameters():
     #     print(name)
@@ -919,6 +966,8 @@ def main():
 
     print_memory_consumed()
     print("before train run")
+
+    crit = torch.nn.CrossEntropyLoss()
     for epoch in range(starting_epoch, args.num_train_epochs):
         # acc = evaluate(
         #     model=model,
@@ -947,10 +996,27 @@ def main():
         start = time.time()
         for step, batch in enumerate(active_dataloader):
             with accelerator.accumulate(model):
-                outputs = model(**batch, use_cache=False)
-                loss = outputs.loss
+                input_ids, targets, _ = (
+                    batch["input_ids"],
+                    batch["labels"],
+                    batch["attention_mask"],
+                )
+                input_ids = input_ids.to("cuda")
+                targets = targets.to("cuda")
+                logits = model(input_ids)  # , lm_head_chunk_size=128)
+
+                logits = logits[..., :-1, :]
+                shift_logits = logits.view(
+                    -1, logits.shape[-1]
+                )  # self.config.vocab_size)
+                shift_labels = targets[..., 1:]
+                shift_labels = shift_labels.view(-1)
+                loss = crit(shift_logits, shift_labels)
+
+                # outputs = model(**batch, use_cache=False)
+                # loss = outputs.loss
                 # We keep track of the loss at each logged step
-                total_loss += loss.detach().float()
+                # total_loss += loss.detach().float()
 
                 # print("loss:", loss)
 
@@ -1123,8 +1189,9 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
             batch["attention_mask"],
         )
         input_ids = input_ids.to("cuda")
-        outputs = model(input_ids)
-        logits = outputs.logits
+        logits = model(input_ids)
+
+        # logits = outputs.logits
 
         seq_len = torch.sum(mask, dim=1)
         batch_probs = torch.softmax(
