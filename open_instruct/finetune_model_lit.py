@@ -43,11 +43,7 @@ import warnings
 
 from lit_gpt.lora import GPT, Block, Config, lora_filter, mark_only_lora_as_trainable
 from lit_gpt.utils import (
-    chunked_cross_entropy,
-    get_default_supported_precision,
-    load_checkpoint,
     num_parameters,
-    update_config,
 )
 
 
