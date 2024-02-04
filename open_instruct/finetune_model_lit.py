@@ -629,6 +629,7 @@ def main():
     )
 
     model = GPT(config)
+    model = model.to(dtype = torch.bfloat16)
     mark_only_lora_as_trainable(model)
 
     print(
@@ -965,14 +966,14 @@ def main():
 
     crit = torch.nn.CrossEntropyLoss()
     for epoch in range(starting_epoch, args.num_train_epochs):
-        # acc = evaluate(
-        #     model=model,
-        #     dataloader=test_loader,
-        #     tokenizer=tokenizer,
-        #    restrict_targets=True,
-        # )
-        # print(f"baseline average mmlu test accuracy: {acc:.4f}")
-        # print_memory_consumed()
+        acc = evaluate(
+           model=model,
+            dataloader=test_loader,
+            tokenizer=tokenizer,
+           restrict_targets=True,
+        )
+        print(f"baseline average mmlu test accuracy: {acc:.4f}")
+        print_memory_consumed()
         # print("before after evaluate")
 
         model.train()
@@ -1012,7 +1013,7 @@ def main():
                 # outputs = model(**batch, use_cache=False)
                 # loss = outputs.loss
                 # We keep track of the loss at each logged step
-                # total_loss += loss.detach().float()
+                total_loss += loss.detach().float()
 
                 # print("loss:", loss)
 
