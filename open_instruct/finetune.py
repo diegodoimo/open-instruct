@@ -600,15 +600,15 @@ def main():
 
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.
-    # embedding_size = model.get_input_embeddings().weight.shape[0]
-    # if len(tokenizer) > embedding_size:
-    #     model.resize_token_embeddings(len(tokenizer))
+    embedding_size = model.get_input_embeddings().weight.shape[0]
+    if len(tokenizer) > embedding_size:
+        model.resize_token_embeddings(len(tokenizer))
 
-    # print("model embedding resized. \n\n")
-    # sys.stdout.flush()
+    print("model embedding resized. \n\n")
+    sys.stdout.flush()
 
     # tokenizer.pad_token = "<pad>"
-    tokenizer.pad_token_id = tokenizer.eos_token_id
+    #tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if args.use_lora:
         if args.use_qlora:
@@ -641,25 +641,27 @@ def main():
     #     if param.requires_grad:
     #         print(name)
 
-    def bp_hooks(model, names):
-        def get_hook(name):
-            def hook_fn(model, grad_input, grad_output):
-                #torch.save(grad_input, f"./results/{name}_grad_input_hf.pt")
-                #torch.save(grad_output, f"./results/{name}_grad_output_hf.pt")
-                x =1
-            return hook_fn
+    # def bp_hooks(model, names):
+    #     def get_hook(name):
+    #         def hook_fn(model, grad_input, grad_output):
+    #             torch.save(grad_input, f"./results/{name}_grad_input_hf.pt")
+    #             torch.save(grad_output, f"./results/{name}_grad_output_hf.pt")
+    #             print(f"grad_output {name}", grad_output)
+    #             print(f"grad_input {name}", grad_input)
 
-        for name, module in model.named_modules():
-            if name in names:
-                module.register_full_backward_hook(get_hook(name))
+    #         return hook_fn
 
-    names = [
-        "base_model.model.lm_head",
-        "base_model.model.model.norm",
-        # "_forward_module.transformer.h.2.mlp.proj.lora_B",
-        # "_forward_module.transformer.h.2.mlp.proj.lora_A",
-    ]
-    bp_hooks(model, names)
+    #     for name, module in model.named_modules():
+    #         if name in names:
+    #             module.register_full_backward_hook(get_hook(name))
+
+    # names = [
+    #     "base_model.model.lm_head",
+    #     "base_model.model.model.norm",
+    #     # "_forward_module.transformer.h.2.mlp.proj.lora_B",
+    #     # "_forward_module.transformer.h.2.mlp.proj.lora_A",
+    # ]
+    # bp_hooks(model, names)
 
     # Preprocessing the datasets.
     print("start preprocessing the data. \n\n")
@@ -918,15 +920,15 @@ def main():
     print_memory_consumed()
     print("before train run")
     for epoch in range(starting_epoch, args.num_train_epochs):
-        #acc = evaluate(
-        #     model=model,
-        #     dataloader=test_loader,
-        #     tokenizer=tokenizer,
-        #    restrict_targets=True,
-        #)
-        #print(f"baseline average mmlu test accuracy: {acc:.4f}")
-        #print_memory_consumed()
-        #print("before after evaluate")
+        acc = evaluate(
+             model=model,
+             dataloader=test_loader,
+             tokenizer=tokenizer,
+            restrict_targets=True,
+        )
+        print(f"baseline average mmlu test accuracy: {acc:.4f}")
+        print_memory_consumed()
+        print("before after evaluate")
 
         model.train()
         total_loss = 0
@@ -950,10 +952,7 @@ def main():
                 # We keep track of the loss at each logged step
                 total_loss += loss.detach().float()
 
-                #print("loss:", loss)
-                print("input_ids:", batch["input_ids"])
-                #print("input_ids_shape:", batch["input_ids"].shape)
-
+                # print("loss:", loss)
 
                 #torch.save(w0, f"./results/key_weight_iter{step}_hf.pt")
                 # print("grad: ", grad0)
@@ -971,6 +970,31 @@ def main():
                 optimizer.zero_grad()
                 lr_scheduler.step()
 
+                # print("after optimizer step")
+                # print(
+                #     "h31_loraA: ",
+                #     model.base_model.model.model.layers[
+                #         31
+                #     ].self_attn.q_proj.lora_A.default.weight.grad,
+                # )
+                # print(
+                #     "h31s_loraB: ",
+                #     model.base_model.model.model.layers[
+                #         31
+                #     ].self_attn.q_proj.lora_B.default.weight.grad
+                # )
+                # print(
+                #     "h0_loraA: ",
+                #     model.base_model.model.model.layers[
+                #         0
+                #     ].self_attn.q_proj.lora_A.default.weight.grad,
+                # )
+                # print(
+                #     "h0_loraB: ",
+                #     model.base_model.model.model.layers[
+                #         0
+                #     ].self_attn.q_proj.lora_B.default.weight.grad,
+                # )
 
             # if accelerator.sync_gradients:
             # print("input_ids:", batch["input_ids"])
@@ -993,7 +1017,6 @@ def main():
 
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
-                assert False
                 # progress_bar.update(1)
                 completed_steps += 1
                 if args.logging_steps and completed_steps % args.logging_steps == 0:
