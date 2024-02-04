@@ -31,7 +31,7 @@ accelerate launch \
     --mixed_precision bf16 \
     --num_machines 1 \
     --num_processes $NUM_GPUS \
-    open_instruct/finetune.py \
+    open_instruct/finetune_model_lit.py \
     --model_name_or_path  /u/area/ddoimo/ddoimo/llama/llama_v1/models_lit/llama-1-7b \
     --use_lora \
     --lora_rank 64 \
