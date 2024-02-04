@@ -608,7 +608,7 @@ def main():
     sys.stdout.flush()
 
     # tokenizer.pad_token = "<pad>"
-    #tokenizer.pad_token_id = tokenizer.eos_token_id
+    # tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if args.use_lora:
         if args.use_qlora:
@@ -921,9 +921,9 @@ def main():
     print("before train run")
     for epoch in range(starting_epoch, args.num_train_epochs):
         acc = evaluate(
-             model=model,
-             dataloader=test_loader,
-             tokenizer=tokenizer,
+            model=model,
+            dataloader=test_loader,
+            tokenizer=tokenizer,
             restrict_targets=True,
         )
         print(f"baseline average mmlu test accuracy: {acc:.4f}")
@@ -954,7 +954,7 @@ def main():
 
                 # print("loss:", loss)
 
-                #torch.save(w0, f"./results/key_weight_iter{step}_hf.pt")
+                # torch.save(w0, f"./results/key_weight_iter{step}_hf.pt")
                 # print("grad: ", grad0)
                 # grad1 = model.base_model.model.model.layers[
                 #     0
@@ -962,7 +962,7 @@ def main():
 
                 accelerator.backward(loss)
                 # print("grad: ", model.model.model.embed_tokens.weight.grad)
-                #torch.save(model.model.lm_head.weight.grad, "./results/lm_head_grad_hf_first.pt")
+                # torch.save(model.model.lm_head.weight.grad, "./results/lm_head_grad_hf_first.pt")
                 # clip gradient norm. don't do this with deepspeed
                 if accelerator.sync_gradients and args.clip_grad_norm > 0:
                     accelerator.clip_grad_norm_(model.parameters(), args.clip_grad_norm)
@@ -1121,7 +1121,7 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         input_ids = input_ids.to("cuda")
         outputs = model(input_ids)
         logits = outputs.logits
-
+        assert False
         seq_len = torch.sum(mask, dim=1)
         batch_probs = torch.softmax(
             logits[torch.arange(input_ids.shape[0]), seq_len - 1, :], dim=-1
