@@ -600,15 +600,15 @@ def main():
 
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.
-    # embedding_size = model.get_input_embeddings().weight.shape[0]
-    # if len(tokenizer) > embedding_size:
-    #     model.resize_token_embeddings(len(tokenizer))
+    embedding_size = model.get_input_embeddings().weight.shape[0]
+    if len(tokenizer) > embedding_size:
+        model.resize_token_embeddings(len(tokenizer))
 
-    # print("model embedding resized. \n\n")
-    # sys.stdout.flush()
+    print("model embedding resized. \n\n")
+    sys.stdout.flush()
 
     # tokenizer.pad_token = "<pad>"
-    tokenizer.pad_token_id = tokenizer.eos_token_id
+    #tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if args.use_lora:
         if args.use_qlora:
@@ -920,15 +920,15 @@ def main():
     print_memory_consumed()
     print("before train run")
     for epoch in range(starting_epoch, args.num_train_epochs):
-        #acc = evaluate(
-        #     model=model,
-        #     dataloader=test_loader,
-        #     tokenizer=tokenizer,
-        #    restrict_targets=True,
-        #)
-        #print(f"baseline average mmlu test accuracy: {acc:.4f}")
-        #print_memory_consumed()
-        #print("before after evaluate")
+        acc = evaluate(
+             model=model,
+             dataloader=test_loader,
+             tokenizer=tokenizer,
+            restrict_targets=True,
+        )
+        print(f"baseline average mmlu test accuracy: {acc:.4f}")
+        print_memory_consumed()
+        print("before after evaluate")
 
         model.train()
         total_loss = 0
@@ -954,11 +954,7 @@ def main():
 
                 # print("loss:", loss)
 
-                # print("input_ids:", batch["input_ids"])
-                # print("logits:", outputs.logits)
-                # grad0 = model.base_model.model.model.layers[
-                #     0
-                # ].self_attn.q_proj.lora_A.default.weight.grad
+                #torch.save(w0, f"./results/key_weight_iter{step}_hf.pt")
                 # print("grad: ", grad0)
                 # grad1 = model.base_model.model.model.layers[
                 #     0
@@ -966,7 +962,7 @@ def main():
 
                 accelerator.backward(loss)
                 # print("grad: ", model.model.model.embed_tokens.weight.grad)
-                # print("out: ", model.model.lm_head.weight.grad)
+                #torch.save(model.model.lm_head.weight.grad, "./results/lm_head_grad_hf_first.pt")
                 # clip gradient norm. don't do this with deepspeed
                 if accelerator.sync_gradients and args.clip_grad_norm > 0:
                     accelerator.clip_grad_norm_(model.parameters(), args.clip_grad_norm)
