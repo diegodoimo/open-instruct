@@ -435,7 +435,9 @@ def main():
     print("model loaded. \n\n")
     sys.stdout.flush()
 
-    tokenizer = get_tokenizer(args.tokenizer_name)
+    tokenizer = get_tokenizer(
+        tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
+    )
 
     # ****************************************************************************
 
