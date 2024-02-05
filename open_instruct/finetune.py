@@ -1121,7 +1121,8 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         input_ids = input_ids.to("cuda")
         outputs = model(input_ids)
         logits = outputs.logits
-        assert False
+        if iter_num > 2:
+            assert False
         seq_len = torch.sum(mask, dim=1)
         batch_probs = torch.softmax(
             logits[torch.arange(input_ids.shape[0]), seq_len - 1, :], dim=-1
