@@ -50,7 +50,7 @@ import warnings
 #     sys.path.append("/home/diego/area_science/ricerca/finetuning_llm/final/lit_gpt")
 from my_utils.dataloader_utils import get_dataloader
 from my_utils.helpers import print_memory_consumed
-from my_utils.dataset_utils import get_dataset, get_mmlu_open_instruct
+from my_utils.dataset_utils import get_dataset_hf, get_mmlu_open_instruct
 from my_utils.dataloader_utils import get_dataloader
 from my_utils.optimizer_utils import get_optimizer, get_scheduler
 from my_utils.tokenizer_utils import get_tokenizer
@@ -454,7 +454,7 @@ def main():
 
     # ****************************************************************************
 
-    train_dataset = get_dataset(
+    train_dataset = get_dataset_hf(
         filepath=args.train_file,
         data_name=args.dataset_name,
         tokenizer=tokenizer,
