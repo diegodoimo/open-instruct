@@ -155,6 +155,12 @@ def parse_args():
         help="The maximum total sequence length (prompt+completion) of each training example.",
     )
     parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=1,
+        help="Batch size for the training dataloader.",
+    )
+    parser.add_argument(
         "--per_device_train_batch_size",
         type=int,
         default=1,
@@ -211,6 +217,12 @@ def parse_args():
         "--warmup_ratio",
         type=float,
         default=0,
+        help="Ratio of total training steps used for warmup.",
+    )
+    parser.add_argument(
+        "--warmup_steps",
+        type=int,
+        default=None,
         help="Ratio of total training steps used for warmup.",
     )
     parser.add_argument(
@@ -445,10 +457,10 @@ def main():
         filepath=args.train_file,
         data_name=args.dataset_name,
         tokenizer=tokenizer,
-        max_seq_length=args.max_seq_len,
-        num_processes=args.num_processes,
-        num_train_examples=args.num_train_samples,
-        dataset_info=args.dataset_info,
+        max_seq_length=args.max_seq_length,
+        num_processes=6,
+        num_train_examples=None,
+        dataset_info=None,
     )
     # longest_seq_length_train, _ = get_longest_seq_length(train_dataset)
     # model.max_seq_length = longest_seq_length_train
@@ -461,7 +473,7 @@ def main():
         filepath=args.val_file,
         tokenizer=tokenizer,
         data_fold="val",
-        max_seq_len=2048,
+        max_seq_length=2048,
         num_processes=6,
         num_samples=None,
         subjects=None,
@@ -472,7 +484,7 @@ def main():
             filepath=args.test_file,
             tokenizer=tokenizer,
             data_fold="test",
-            max_seq_len=2048,
+            max_seq_length=2048,
             num_processes=6,
             num_samples=None,
             subjects=None,
@@ -484,10 +496,10 @@ def main():
         train_dataset,
         args.per_device_train_batch_size,
         tokenizer.pad_token_id,
-        max_seq_len=args.max_seq_len,
+        max_seq_len=args.max_seq_length,
         world_size=world_size,
         shuffle=True,
-        num_processes=args.num_processes,
+        num_processes=6,
         return_sampler=True,
     )
 
@@ -498,7 +510,7 @@ def main():
         max_seq_len=2048,
         world_size=world_size,
         shuffle=False,
-        num_processes=args.num_processes,
+        num_processes=6,
     )
     test_loader = None
     if test_dataset is not None:
@@ -509,7 +521,7 @@ def main():
             max_seq_len=2048,
             world_size=world_size,
             shuffle=False,
-            num_processes=args.num_processes,
+            num_processes=6,
         )
 
     # *******************************************************************************
@@ -526,7 +538,7 @@ def main():
     lr_scheduler = get_scheduler(
         args.lr_scheduler_type,
         optimizer,
-        epochs=args.epochs,
+        epochs=args.num_train_epochs,
         num_iters=len(train_loader),
         warmup_steps=args.warmup_steps,
         warmup_ratio=args.warmup_ratio,
@@ -565,7 +577,7 @@ def main():
 
     # Prepare everything with `accelerator`.
     model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        model, optimizer, train_dataloader, lr_scheduler
+        model, optimizer, train_loader, lr_scheduler
     )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
@@ -584,13 +596,13 @@ def main():
 
     # We need to initialize the trackers we use, and also store our configuration.
     # The trackers initializes automatically on the main process.
-    # if args.with_tracking:
-    #     experiment_config = vars(args)
-    #     # TensorBoard cannot log Enums, need the raw value
-    #     experiment_config["lr_scheduler_type"] = experiment_config[
-    #         "lr_scheduler_type"
-    #     ].value
-    #     accelerator.init_trackers("open_instruct", experiment_config)
+    if args.with_tracking:
+        experiment_config = vars(args)
+        # TensorBoard cannot log Enums, need the raw value
+        experiment_config["lr_scheduler_type"] = experiment_config[
+            "lr_scheduler_type"
+        ].value
+        accelerator.init_trackers("open_instruct", experiment_config)
 
     # Train!
     total_batch_size = (
@@ -639,17 +651,17 @@ def main():
     print_memory_consumed()
     print("before train run")
     sys.stdout.flush()
-    for epoch in range(starting_epoch, args.num_train_epochs):
-        acc = evaluate(
+    acc = evaluate(
             model=model,
             dataloader=test_loader,
             tokenizer=tokenizer,
             restrict_targets=True,
         )
-        print(f"baseline average mmlu test accuracy: {acc:.4f}")
-        print_memory_consumed()
-        print("before after evaluate")
-
+    print(f"baseline average mmlu test accuracy: {acc:.4f}")
+    print_memory_consumed()
+    print("before after evaluate")
+    
+    for epoch in range(starting_epoch, args.num_train_epochs):
         model.train()
         total_loss = 0
         if (
@@ -741,6 +753,17 @@ def main():
         #    if args.output_dir is not None:
         #        output_dir = os.path.join(args.output_dir, output_dir)
         #    save_with_accelerate(accelerator, model, tokenizer, output_dir, args)
+
+    acc = evaluate(
+            model=model,
+            dataloader=test_loader,
+            tokenizer=tokenizer,
+            restrict_targets=True,
+    )
+    print(f"baseline average mmlu test accuracy: {acc:.4f}")
+    print_memory_consumed()
+    print("before after evaluate")
+    
 
     # if args.with_tracking:
     #     accelerator.end_training()
