@@ -41,7 +41,9 @@ import time
 import warnings
 
 
-sys.path.append("/orfeo/cephfs/scratch/area/ddoimo/finetuning_llm/final/lit_gpt")
+sys.path.append(
+    "/orfeo/cephfs/scratch/area/ddoimo/open/finetuning_llm/experiments/final/lit_gpt"
+)
 try:
     from my_utils.dataloader_utils import get_dataloader
 except:
@@ -652,15 +654,15 @@ def main():
     print("before train run")
     sys.stdout.flush()
     acc = evaluate(
-            model=model,
-            dataloader=test_loader,
-            tokenizer=tokenizer,
-            restrict_targets=True,
-        )
+        model=model,
+        dataloader=test_loader,
+        tokenizer=tokenizer,
+        restrict_targets=True,
+    )
     print(f"baseline average mmlu test accuracy: {acc:.4f}")
     print_memory_consumed()
     print("before after evaluate")
-    
+
     for epoch in range(starting_epoch, args.num_train_epochs):
         model.train()
         total_loss = 0
@@ -755,15 +757,14 @@ def main():
         #    save_with_accelerate(accelerator, model, tokenizer, output_dir, args)
 
     acc = evaluate(
-            model=model,
-            dataloader=test_loader,
-            tokenizer=tokenizer,
-            restrict_targets=True,
+        model=model,
+        dataloader=test_loader,
+        tokenizer=tokenizer,
+        restrict_targets=True,
     )
     print(f"baseline average mmlu test accuracy: {acc:.4f}")
     print_memory_consumed()
     print("before after evaluate")
-    
 
     # if args.with_tracking:
     #     accelerator.end_training()
