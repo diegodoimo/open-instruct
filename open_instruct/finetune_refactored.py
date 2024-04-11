@@ -41,15 +41,14 @@ import time
 import warnings
 
 
-sys.path.append(
-    "/orfeo/cephfs/scratch/area/ddoimo/open/finetuning_llm/experiments/final/lit_gpt"
-)
-try:
-    from my_utils.dataloader_utils import get_dataloader
-except:
-    sys.path.append("/home/diego/area_science/ricerca/finetuning_llm/final/lit_gpt")
-    from my_utils.dataloader_utils import get_dataloader
-
+# sys.path.append(
+#     "/orfeo/cephfs/scratch/area/ddoimo/open/finetuning_llm/experiments/final/lit_gpt"
+# )
+# try:
+#     from my_utils.dataloader_utils import get_dataloader
+# except:
+#     sys.path.append("/home/diego/area_science/ricerca/finetuning_llm/final/lit_gpt")
+from my_utils.dataloader_utils import get_dataloader
 from my_utils.helpers import print_memory_consumed
 from my_utils.dataset_utils import get_dataset, get_mmlu_open_instruct
 from my_utils.dataloader_utils import get_dataloader
