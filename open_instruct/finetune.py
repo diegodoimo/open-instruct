@@ -709,6 +709,7 @@ def main():
     print("finished preprocessing. \n\n")
     sys.stdout.flush()
 
+    print(train_dataset[0])
     # Log a few random samples from the training set:
     # for index in random.sample(range(len(train_dataset)), 3):
     #    logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")

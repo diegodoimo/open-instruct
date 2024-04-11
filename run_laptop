@@ -16,9 +16,9 @@ accelerate launch \
     --lora_dropout 0.1 \
     --tokenizer_name /home/diego/area_science/ricerca/llama_analysis/hf_llama \
     --use_slow_tokenizer \
-    --train_file "/home/diego/Documents/area_science/ricerca/finetuning_llm/final/data/open_instruct/processed/lima/lima_data.jsonl" \
-    --val_file "/home/diego/Documents/area_science/ricerca/finetuning_llm/final/data/open_instruct/eval/mmlu" \
-    --test_file "/home/diego/Documents/area_science/ricerca/finetuning_llm/final/data/open_instruct/eval/mmlu" \
+    --train_file "/home/diego/area_science/ricerca/data/open_instruct/processed/lima/lima_data.jsonl" \
+    --val_file "/home/diego/area_science/ricerca/data/open_instruct/eval/mmlu" \
+    --test_file "/home/diego/area_science/ricerca/data/open_instruct/eval/mmlu" \
     --max_seq_length 1024 \
     --preprocessing_num_workers 16 \
     --checkpointing_steps epoch \
