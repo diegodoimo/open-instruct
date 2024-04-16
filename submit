@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=32           
 #SBATCH --mem=80G                
 #SBATCH --job-name=test
-#SBATCH --gres=gpu:2 
+#SBATCH --gres=gpu:1 
 
 source /etc/profile.d/modules.sh
 module use /opt/nvidia/hpc_sdk/modulefiles/
@@ -20,7 +20,7 @@ export OMP_NUM_THREADS=32
 #export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 MODEL_SIZE=7B
-NUM_GPUS=2
+NUM_GPUS=1
 TOTAL_BATCH_SIZE=128
 BATCH_SIZE_PER_GPU=1
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
@@ -39,7 +39,7 @@ accelerate launch \
     --lora_dropout 0.1 \
     --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v1/models_hf/7B \
     --use_slow_tokenizer \
-    --train_file /orfeo/cephfs/scratch/area/ddoimo/open/open-instruct/data/processed/dolly/dolly_data.jsonl 
+    --train_file /orfeo/cephfs/scratch/area/ddoimo/open/open-instruct/data/processed/dolly/dolly_data.jsonl \
     --val_file /orfeo/cephfs/scratch/area/ddoimo/open/open-instruct/data/eval/mmlu \
     --test_file /orfeo/cephfs/scratch/area/ddoimo/open/open-instruct/data/eval/mmlu \
     --max_seq_length 1024 \
