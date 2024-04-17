@@ -2,6 +2,7 @@ import torch
 
 IGNORE_INDEX = -100
 
+
 def encode_plain(example, tokenizer, max_seq_length, text_field):
     example_text = example[text_field]
     tokenized_example = tokenizer(
@@ -187,7 +188,11 @@ def encode_open_instruct_mmlu(
     prompt = train_prompt + prompt_end
 
     tokenized_example = tokenizer(
-        prompt, return_tensors="pt", max_length=max_seq_length, truncation=False
+        prompt,
+        return_tensors="pt",
+        max_length=max_seq_length,
+        truncation=False,
+        add_special_tokens=True,
     )
 
     tokenized_labels = tokenizer(example["answers"], return_tensors="pt")
@@ -197,6 +202,8 @@ def encode_open_instruct_mmlu(
     attention_mask = torch.ones_like(input_ids)
 
     return {
+        "prompt": prompt,
+        "answers": example["answers"],
         "input_ids": input_ids.flatten(),
         "labels": labels.flatten(),
         "attention_mask": attention_mask.flatten(),

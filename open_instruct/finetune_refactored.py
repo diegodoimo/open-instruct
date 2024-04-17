@@ -479,6 +479,7 @@ def main():
         num_samples=None,
         subjects=None,
     )
+
     test_dataset = None
     if args.test_file is not None:
         test_dataset = get_mmlu_open_instruct(
@@ -525,6 +526,14 @@ def main():
             num_processes=6,
         )
 
+    # instance = next(iter(test_loader))
+    # tokens = instance["input_ids"][0]
+    # labels = instance["labels"][0]
+    # prompt = test_loader.dataset["prompt"][0]
+    # answers = test_loader.dataset["answers"][0]
+    # print(repr(prompt), repr(answers))
+    # print(tokens, labels)
+    # assert False
     # *******************************************************************************
 
     gradient_accumulation_iters = max(
@@ -660,7 +669,7 @@ def main():
     )
     print(f"baseline average mmlu test accuracy: {acc:.4f}")
     print_memory_consumed()
-    print("before after evaluate")
+    print("after evaluate")
 
     for epoch in range(starting_epoch, args.num_train_epochs):
         model.train()
