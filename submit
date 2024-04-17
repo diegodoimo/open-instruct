@@ -9,9 +9,9 @@
 #SBATCH --job-name=test
 #SBATCH --gres=gpu:1 
 
-source /etc/profile.d/modules.sh
-module use /opt/nvidia/hpc_sdk/modulefiles/
-module load nvhpc
+#source /etc/profile.d/modules.sh
+#module use /opt/nvidia/hpc_sdk/modulefiles/
+#module load nvhpc
 source /u/area/ddoimo/anaconda3/bin/activate ./env_amd
 
 #conda activate ./env_amd
@@ -39,9 +39,9 @@ accelerate launch \
     --lora_dropout 0.1 \
     --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v1/models_hf/7B \
     --use_slow_tokenizer \
-    --train_file /orfeo/cephfs/scratch/area/ddoimo/open-instruct/data/processed/dolly/dolly_data.jsonl \
-    --val_file /orfeo/cephfs/scratch/area/ddoimo/open-instruct/data/eval/mmlu \
-    --test_file /orfeo/cephfs/scratch/area/ddoimo/open-instruct/data/eval/mmlu \
+    --train_file /orfeo/cephfs/scratch/area/ddoimo/open/open-instruct/data/processed/dolly/dolly_data.jsonl \
+    --val_file /orfeo/cephfs/scratch/area/ddoimo/open/open-instruct/data/eval/mmlu \
+    --test_file /orfeo/cephfs/scratch/area/ddoimo/open/open-instruct/data/eval/mmlu \
     --max_seq_length 1024 \
     --preprocessing_num_workers 16 \
     --checkpointing_steps epoch \
