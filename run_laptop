@@ -5,11 +5,14 @@ BATCH_SIZE_PER_GPU=1
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 #echo "Training llama model ${MODEL_SIZE} using $NUM_GPUS GPUs, $BATCH_SIZE_PER_GPU batch size per GPU, $GRADIENT_ACC_STEPS gradient accumulation steps"
 
+
+accelerate launch -h 
+
 # Lora training
 accelerate launch \
     --num_machines 1 \
     --num_processes 1 \
-    open_instruct/finetune.py \
+    open_instruct/finetune_refactored.py \
     --use_lora \
     --lora_rank 64 \
     --lora_alpha 16 \
@@ -23,7 +26,7 @@ accelerate launch \
     --preprocessing_num_workers 16 \
     --checkpointing_steps epoch \
     --per_device_train_batch_size $BATCH_SIZE_PER_GPU \
-    --per_device_eval_batch_size 4 \
+    --per_device_eval_batch_size 2 \
     --gradient_accumulation_steps $GRADIENT_ACC_STEPS \
     --learning_rate 1e-4 \
     --lr_scheduler_type linear \

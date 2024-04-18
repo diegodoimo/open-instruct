@@ -261,11 +261,11 @@ def get_mmlu_open_instruct(
         batched=False,  # True,  # False,
         num_proc=num_processes,
         load_from_cache_file=False,
-        remove_columns=[
-            name
-            for name in test_df.column_names
-            if name not in ["input_ids", "labels", "attention_mask"]
-        ],
+        # remove_columns=[
+        #     name
+        #     for name in test_df.column_names
+        #     if name not in ["prompt", "input_ids", "labels", "attention_mask"]
+        # ],
     )
 
     lm_datasets.set_format(type="pt")
