@@ -33,10 +33,22 @@ from transformers import (
 )
 from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
 
-from data_utils import get_mmlu_open_instruct, DataCollatorForCausalLM
+# from data_utils import get_mmlu_open_instruct, DataCollatorForCausalLM
 import numpy as np
 import sys
-import time 
+import time
+
+
+# *******************************************************************************
+from my_utils.dataloader_utils import get_dataloader
+from my_utils.helpers import print_memory_consumed
+from my_utils.dataset_utils import get_dataset_hf, get_mmlu_open_instruct
+from my_utils.dataloader_utils import get_dataloader
+from my_utils.optimizer_utils import get_optimizer, get_scheduler
+from my_utils.tokenizer_utils import get_tokenizer
+
+# *******************************************************************
+
 
 logger = get_logger(__name__)
 
@@ -293,146 +305,146 @@ def parse_args():
     return args
 
 
-def print_memory_consumed():
-    # rank = int(os.environ["RANK"])
-    torch.cuda.empty_cache()
-    allocated = torch.cuda.max_memory_allocated() / 2**30
-    reserved = torch.cuda.max_memory_reserved() / 2**30
-    # if rank == 0:
-    print(f"CUDA mem allocated: {allocated} GB")
-    print(f"CUDA mem reserved: {reserved} GB")
-    sys.stdout.flush()
+# def print_memory_consumed():
+#     # rank = int(os.environ["RANK"])
+#     torch.cuda.empty_cache()
+#     allocated = torch.cuda.max_memory_allocated() / 2**30
+#     reserved = torch.cuda.max_memory_reserved() / 2**30
+#     # if rank == 0:
+#     print(f"CUDA mem allocated: {allocated} GB")
+#     print(f"CUDA mem reserved: {reserved} GB")
+#     sys.stdout.flush()
 
 
-def encode_with_prompt_completion_format(example, tokenizer, max_seq_length):
-    """
-    Here we assume each example has 'prompt' and 'completion' fields.
-    We concatenate prompt and completion and tokenize them together because otherwise prompt will be padded/trancated
-    and it doesn't make sense to follow directly with the completion.
-    """
-    # if prompt doesn't end with space and completion doesn't start with space, add space
-    if not example["prompt"].endswith((" ", "\n", "\t")) and not example[
-        "completion"
-    ].startswith((" ", "\n", "\t")):
-        example_text = example["prompt"] + " " + example["completion"]
-    else:
-        example_text = example["prompt"] + example["completion"]
-    example_text = example_text + tokenizer.eos_token
-    tokenized_example = tokenizer(
-        example_text, return_tensors="pt", max_length=max_seq_length, truncation=True
-    )
-    input_ids = tokenized_example.input_ids
-    labels = input_ids.clone()
-    tokenized_prompt = tokenizer(
-        example["prompt"],
-        return_tensors="pt",
-        max_length=max_seq_length,
-        truncation=True,
-    )
-    # mask the prompt part for avoiding loss
-    labels[:, : tokenized_prompt.input_ids.shape[1]] = -100
-    attention_mask = torch.ones_like(input_ids)
-    return {
-        "input_ids": input_ids.flatten(),
-        "labels": labels.flatten(),
-        "attention_mask": attention_mask.flatten(),
-    }
+# def encode_with_prompt_completion_format(example, tokenizer, max_seq_length):
+#     """
+#     Here we assume each example has 'prompt' and 'completion' fields.
+#     We concatenate prompt and completion and tokenize them together because otherwise prompt will be padded/trancated
+#     and it doesn't make sense to follow directly with the completion.
+#     """
+#     # if prompt doesn't end with space and completion doesn't start with space, add space
+#     if not example["prompt"].endswith((" ", "\n", "\t")) and not example[
+#         "completion"
+#     ].startswith((" ", "\n", "\t")):
+#         example_text = example["prompt"] + " " + example["completion"]
+#     else:
+#         example_text = example["prompt"] + example["completion"]
+#     example_text = example_text + tokenizer.eos_token
+#     tokenized_example = tokenizer(
+#         example_text, return_tensors="pt", max_length=max_seq_length, truncation=True
+#     )
+#     input_ids = tokenized_example.input_ids
+#     labels = input_ids.clone()
+#     tokenized_prompt = tokenizer(
+#         example["prompt"],
+#         return_tensors="pt",
+#         max_length=max_seq_length,
+#         truncation=True,
+#     )
+#     # mask the prompt part for avoiding loss
+#     labels[:, : tokenized_prompt.input_ids.shape[1]] = -100
+#     attention_mask = torch.ones_like(input_ids)
+#     return {
+#         "input_ids": input_ids.flatten(),
+#         "labels": labels.flatten(),
+#         "attention_mask": attention_mask.flatten(),
+#     }
 
 
-def encode_with_messages_format(example, tokenizer, max_seq_length):
-    """
-    Here we assume each example has a 'messages' field Each message is a dict with 'role' and 'content' fields.
-    We concatenate all messages with the roles as delimiters and tokenize them together.
-    """
-    messages = example["messages"]
-    if len(messages) == 0:
-        raise ValueError("messages field is empty.")
+# def encode_with_messages_format(example, tokenizer, max_seq_length):
+#     """
+#     Here we assume each example has a 'messages' field Each message is a dict with 'role' and 'content' fields.
+#     We concatenate all messages with the roles as delimiters and tokenize them together.
+#     """
+#     messages = example["messages"]
+#     if len(messages) == 0:
+#         raise ValueError("messages field is empty.")
 
-    def _concat_messages(messages):
-        message_text = ""
-        for message in messages:
-            if message["role"] == "system":
-                message_text += "<|system|>\n" + message["content"].strip() + "\n"
-            elif message["role"] == "user":
-                message_text += "<|user|>\n" + message["content"].strip() + "\n"
-            elif message["role"] == "assistant":
-                message_text += (
-                    "<|assistant|>\n"
-                    + message["content"].strip()
-                    + tokenizer.eos_token
-                    + "\n"
-                )
-            else:
-                raise ValueError("Invalid role: {}".format(message["role"]))
-        return message_text
+#     def _concat_messages(messages):
+#         message_text = ""
+#         for message in messages:
+#             if message["role"] == "system":
+#                 message_text += "<|system|>\n" + message["content"].strip() + "\n"
+#             elif message["role"] == "user":
+#                 message_text += "<|user|>\n" + message["content"].strip() + "\n"
+#             elif message["role"] == "assistant":
+#                 message_text += (
+#                     "<|assistant|>\n"
+#                     + message["content"].strip()
+#                     + tokenizer.eos_token
+#                     + "\n"
+#                 )
+#             else:
+#                 raise ValueError("Invalid role: {}".format(message["role"]))
+#         return message_text
 
-    example_text = _concat_messages(messages).strip()
-    tokenized_example = tokenizer(
-        example_text, return_tensors="pt", max_length=max_seq_length, truncation=True
-    )
-    input_ids = tokenized_example.input_ids
-    labels = input_ids.clone()
+#     example_text = _concat_messages(messages).strip()
+#     tokenized_example = tokenizer(
+#         example_text, return_tensors="pt", max_length=max_seq_length, truncation=True
+#     )
+#     input_ids = tokenized_example.input_ids
+#     labels = input_ids.clone()
 
-    # mask the non-assistant part for avoiding loss
-    for message_idx, message in enumerate(messages):
-        if message["role"] != "assistant":
-            if message_idx == 0:
-                message_start_idx = 0
-            else:
-                message_start_idx = tokenizer(
-                    _concat_messages(messages[:message_idx]),
-                    return_tensors="pt",
-                    max_length=max_seq_length,
-                    truncation=True,
-                ).input_ids.shape[1]
-            if (
-                message_idx < len(messages) - 1
-                and messages[message_idx + 1]["role"] == "assistant"
-            ):
-                # here we also ignore the role of the assistant
-                messages_so_far = (
-                    _concat_messages(messages[: message_idx + 1]) + "<|assistant|>\n"
-                )
-            else:
-                messages_so_far = _concat_messages(messages[: message_idx + 1])
-            message_end_idx = tokenizer(
-                messages_so_far,
-                return_tensors="pt",
-                max_length=max_seq_length,
-                truncation=True,
-            ).input_ids.shape[1]
-            labels[:, message_start_idx:message_end_idx] = -100
+#     # mask the non-assistant part for avoiding loss
+#     for message_idx, message in enumerate(messages):
+#         if message["role"] != "assistant":
+#             if message_idx == 0:
+#                 message_start_idx = 0
+#             else:
+#                 message_start_idx = tokenizer(
+#                     _concat_messages(messages[:message_idx]),
+#                     return_tensors="pt",
+#                     max_length=max_seq_length,
+#                     truncation=True,
+#                 ).input_ids.shape[1]
+#             if (
+#                 message_idx < len(messages) - 1
+#                 and messages[message_idx + 1]["role"] == "assistant"
+#             ):
+#                 # here we also ignore the role of the assistant
+#                 messages_so_far = (
+#                     _concat_messages(messages[: message_idx + 1]) + "<|assistant|>\n"
+#                 )
+#             else:
+#                 messages_so_far = _concat_messages(messages[: message_idx + 1])
+#             message_end_idx = tokenizer(
+#                 messages_so_far,
+#                 return_tensors="pt",
+#                 max_length=max_seq_length,
+#                 truncation=True,
+#             ).input_ids.shape[1]
+#             labels[:, message_start_idx:message_end_idx] = -100
 
-            if message_end_idx >= max_seq_length:
-                break
+#             if message_end_idx >= max_seq_length:
+#                 break
 
-    attention_mask = torch.ones_like(input_ids)
-    return {
-        "input_ids": input_ids.flatten(),
-        "labels": labels.flatten(),
-        "attention_mask": attention_mask.flatten(),
-    }
+#     attention_mask = torch.ones_like(input_ids)
+#     return {
+#         "input_ids": input_ids.flatten(),
+#         "labels": labels.flatten(),
+#         "attention_mask": attention_mask.flatten(),
+#     }
 
 
-def save_with_accelerate(accelerator, model, tokenizer, output_dir, args):
-    unwrapped_model = accelerator.unwrap_model(model)
-    # When doing multi-gpu training, we need to use accelerator.get_state_dict(model) to get the state_dict.
-    # Otherwise, sometimes the model will be saved with only part of the parameters.
-    # Also, accelerator needs to use the wrapped model to get the state_dict.
-    state_dict = accelerator.get_state_dict(model)
-    if args.use_lora:
-        # When using lora, the unwrapped model is a PeftModel, which doesn't support the is_main_process
-        # and has its own save_pretrained function for only saving lora modules.
-        # We have to manually specify the is_main_process outside the save_pretrained function.
-        if accelerator.is_main_process:
-            unwrapped_model.save_pretrained(output_dir, state_dict=state_dict)
-    else:
-        unwrapped_model.save_pretrained(
-            output_dir,
-            is_main_process=accelerator.is_main_process,
-            save_function=accelerator.save,
-            state_dict=state_dict,
-        )
+# def save_with_accelerate(accelerator, model, tokenizer, output_dir, args):
+#     unwrapped_model = accelerator.unwrap_model(model)
+#     # When doing multi-gpu training, we need to use accelerator.get_state_dict(model) to get the state_dict.
+#     # Otherwise, sometimes the model will be saved with only part of the parameters.
+#     # Also, accelerator needs to use the wrapped model to get the state_dict.
+#     state_dict = accelerator.get_state_dict(model)
+#     if args.use_lora:
+#         # When using lora, the unwrapped model is a PeftModel, which doesn't support the is_main_process
+#         # and has its own save_pretrained function for only saving lora modules.
+#         # We have to manually specify the is_main_process outside the save_pretrained function.
+#         if accelerator.is_main_process:
+#             unwrapped_model.save_pretrained(output_dir, state_dict=state_dict)
+#     else:
+#         unwrapped_model.save_pretrained(
+#             output_dir,
+#             is_main_process=accelerator.is_main_process,
+#             save_function=accelerator.save,
+#             state_dict=state_dict,
+#         )
 
 
 def main():
@@ -475,22 +487,28 @@ def main():
 
     accelerator.wait_for_everyone()
 
-    if args.dataset_name is not None:
-        # Downloading and loading a dataset from the hub.
-        raw_datasets = load_dataset(
-            args.dataset_name,
-            args.dataset_config_name,
-        )
-    else:
-        data_files = {}
-        dataset_args = {}
-        if args.train_file is not None:
-            data_files["train"] = args.train_file
-        raw_datasets = load_dataset(
-            "json",
-            data_files=data_files,
-            **dataset_args,
-        )
+    # ********************************************************
+    world_size = accelerator.num_processes()
+
+    # *******************************************************
+    # ********************************************************
+
+    # if args.dataset_name is not None:
+    #     # Downloading and loading a dataset from the hub.
+    #     raw_datasets = load_dataset(
+    #         args.dataset_name,
+    #         args.dataset_config_name,
+    #     )
+    # else:
+    #     data_files = {}
+    #     dataset_args = {}
+    #     if args.train_file is not None:
+    #         data_files["train"] = args.train_file
+    #     raw_datasets = load_dataset(
+    #         "json",
+    #         data_files=data_files,
+    #         **dataset_args,
+    #     )
 
     # Load pretrained model and tokenizer
     if args.config_name:
@@ -502,22 +520,22 @@ def main():
             "You are instantiating a new config instance from scratch. This is not supported by this script."
         )
 
-    if args.tokenizer_name:
-        tokenizer = AutoTokenizer.from_pretrained(
-            args.tokenizer_name, use_fast=not args.use_slow_tokenizer
-        )
-    elif args.model_name_or_path:
-        tokenizer = AutoTokenizer.from_pretrained(
-            args.model_name_or_path, use_fast=not args.use_slow_tokenizer
-        )
-    else:
-        raise ValueError(
-            "You are instantiating a new tokenizer from scratch. This is not supported by this script."
-            "You can do it from another script, save it, and load it from here, using --tokenizer_name."
-        )
+    # if args.tokenizer_name:
+    #     tokenizer = AutoTokenizer.from_pretrained(
+    #         args.tokenizer_name, use_fast=not args.use_slow_tokenizer
+    #     )
+    # elif args.model_name_or_path:
+    #     tokenizer = AutoTokenizer.from_pretrained(
+    #         args.model_name_or_path, use_fast=not args.use_slow_tokenizer
+    #     )
+    # else:
+    #     raise ValueError(
+    #         "You are instantiating a new tokenizer from scratch. This is not supported by this script."
+    #         "You can do it from another script, save it, and load it from here, using --tokenizer_name."
+    #     )
 
-    print("tokenizer loaded. \n\n")
-    sys.stdout.flush()
+    # print("tokenizer loaded. \n\n")
+    # sys.stdout.flush()
 
     if args.model_name_or_path:
         if args.use_qlora:
@@ -548,7 +566,7 @@ def main():
                 from_tf=bool(".ckpt" in args.model_name_or_path),
                 config=config,
                 low_cpu_mem_usage=args.low_cpu_mem_usage,
-                torch_dtype = torch.bfloat16,
+                torch_dtype=torch.bfloat16,
                 use_flash_attention_2=True if args.use_flash_attn else False,
             )
             print("model loading finished. \n\n")
@@ -560,43 +578,43 @@ def main():
     print("model loaded. \n\n")
     sys.stdout.flush()
 
-    # no default pad token for llama!
-    # here we add all special tokens again, because the default ones are not in the special_tokens_map
-    if isinstance(tokenizer, LlamaTokenizer) or isinstance(
-        tokenizer, LlamaTokenizerFast
-    ):
-        num_added_tokens = tokenizer.add_special_tokens(
-            {
-                "bos_token": "<s>",
-                "eos_token": "</s>",
-                "unk_token": "<unk>",
-                "pad_token": "<pad>",
-            }
-        )
-        assert num_added_tokens in [
-            0,
-            1,
-        ], "LlamaTokenizer should only add one special token - the pad_token, or no tokens if pad token present."
-    elif isinstance(tokenizer, GPTNeoXTokenizerFast):
-        num_added_tokens = tokenizer.add_special_tokens(
-            {
-                "pad_token": "<pad>",
-            }
-        )
-        assert (
-            num_added_tokens == 1
-        ), "GPTNeoXTokenizer should only add one special token - the pad_token."
-    elif isinstance(tokenizer, GPT2Tokenizer) and isinstance(model, OPTForCausalLM):
-        num_added_tokens = tokenizer.add_special_tokens({"unk_token": "<unk>"})
+    # # no default pad token for llama!
+    # # here we add all special tokens again, because the default ones are not in the special_tokens_map
+    # if isinstance(tokenizer, LlamaTokenizer) or isinstance(
+    #     tokenizer, LlamaTokenizerFast
+    # ):
+    #     num_added_tokens = tokenizer.add_special_tokens(
+    #         {
+    #             "bos_token": "<s>",
+    #             "eos_token": "</s>",
+    #             "unk_token": "<unk>",
+    #             "pad_token": "<pad>",
+    #         }
+    #     )
+    #     assert num_added_tokens in [
+    #         0,
+    #         1,
+    #     ], "LlamaTokenizer should only add one special token - the pad_token, or no tokens if pad token present."
+    # elif isinstance(tokenizer, GPTNeoXTokenizerFast):
+    #     num_added_tokens = tokenizer.add_special_tokens(
+    #         {
+    #             "pad_token": "<pad>",
+    #         }
+    #     )
+    #     assert (
+    #         num_added_tokens == 1
+    #     ), "GPTNeoXTokenizer should only add one special token - the pad_token."
+    # elif isinstance(tokenizer, GPT2Tokenizer) and isinstance(model, OPTForCausalLM):
+    #     num_added_tokens = tokenizer.add_special_tokens({"unk_token": "<unk>"})
 
-    # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
-    # on a small vocab and want a smaller embedding size, remove this test.
-    embedding_size = model.get_input_embeddings().weight.shape[0]
-    if len(tokenizer) > embedding_size:
-        model.resize_token_embeddings(len(tokenizer))
+    # # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
+    # # on a small vocab and want a smaller embedding size, remove this test.
+    # embedding_size = model.get_input_embeddings().weight.shape[0]
+    # if len(tokenizer) > embedding_size:
+    #     model.resize_token_embeddings(len(tokenizer))
 
-    print("model embedding resized. \n\n")
-    sys.stdout.flush()
+    # print("model embedding resized. \n\n")
+    # sys.stdout.flush()
 
     if args.use_lora:
         if args.use_qlora:
@@ -625,166 +643,272 @@ def main():
         model.print_trainable_parameters()
 
     # Preprocessing the datasets.
-    print("start preprocessing the data. \n\n")
+    # print("start preprocessing the data. \n\n")
+    # sys.stdout.flush()
+    # if (
+    #     "prompt" in raw_datasets["train"].column_names
+    #     and "completion" in raw_datasets["train"].column_names
+    # ):
+    #     encode_function = partial(
+    #         encode_with_prompt_completion_format,
+    #         tokenizer=tokenizer,
+    #         max_seq_length=args.max_seq_length,
+    #     )
+    # elif "messages" in raw_datasets["train"].column_names:
+    #     encode_function = partial(
+    #         encode_with_messages_format,
+    #         tokenizer=tokenizer,
+    #         max_seq_length=args.max_seq_length,
+    #     )
+    # else:
+    #     raise ValueError(
+    #         "You need to have either 'prompt'&'completion' or 'messages' in your column names."
+    #     )
+
+    # with accelerator.main_process_first():
+    #     lm_datasets = raw_datasets.map(
+    #         encode_function,
+    #         batched=False,
+    #         num_proc=args.preprocessing_num_workers,
+    #         load_from_cache_file=not args.overwrite_cache,
+    #         remove_columns=[
+    #             name
+    #             for name in raw_datasets["train"].column_names
+    #             if name not in ["input_ids", "labels", "attention_mask"]
+    #         ],
+    #         desc="Tokenizing and reformatting instruction data",
+    #     )
+
+    #     lm_datasets.set_format(type="pt")
+    #     lm_datasets = lm_datasets.filter(
+    #         lambda example: (example["labels"] != -100).any()
+    #     )
+
+    # train_dataset = lm_datasets["train"]
+    # print("finished preprocessing. \n\n")
+    # sys.stdout.flush()
+
+    # # Log a few random samples from the training set:
+    # # for index in random.sample(range(len(train_dataset)), 3):
+    # #    logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
+
+    # # DataLoaders creation:
+    # train_dataloader = DataLoader(
+    #     train_dataset,
+    #     shuffle=False,
+    #     # collate_fn=DataCollatorForSeq2Seq(
+    #     #     tokenizer=tokenizer, model=model, padding="longest"
+    #     # ),
+    #     collate_fn=DataCollatorForCausalLM(
+    #         tokenizer=tokenizer, max_seq_len=args.max_seq_length
+    #     ),
+    #     batch_size=args.per_device_train_batch_size,
+    # )
+
+    # print(len(train_dataloader))
+
+    # val_dataset = get_mmlu_open_instruct(
+    #     filepath=args.test_file,
+    #     tokenizer=tokenizer,
+    #     data_fold="val",
+    #     max_seq_length=args.max_seq_length,
+    #     num_processes=6,
+    #     num_samples=None,
+    #     subjects=None,
+    # )
+
+    # val_loader = DataLoader(
+    #     val_dataset,
+    #     shuffle=False,
+    #     collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
+    #     batch_size=args.per_device_eval_batch_size,
+    # )
+
+    # test_dataset = get_mmlu_open_instruct(
+    #     filepath=args.test_file,
+    #     tokenizer=tokenizer,
+    #     data_fold="test",
+    #     max_seq_length=args.max_seq_length,
+    #     num_processes=6,
+    #     num_samples=None,
+    #     subjects=None,
+    # )
+
+    # test_loader = DataLoader(
+    #     test_dataset,
+    #     shuffle=False,
+    #     collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
+    #     batch_size=args.per_device_eval_batch_size,
+    # )
+    # # Optimizer
+    # # Split weights in two groups, one with weight decay and the other not.
+    # no_decay = ["bias", "layer_norm.weight"]
+    # optimizer_grouped_parameters = [
+    #     {
+    #         "params": [
+    #             p
+    #             for n, p in model.named_parameters()
+    #             if not any(nd in n for nd in no_decay)
+    #         ],
+    #         "weight_decay": args.weight_decay,
+    #     },
+    #     {
+    #         "params": [
+    #             p
+    #             for n, p in model.named_parameters()
+    #             if any(nd in n for nd in no_decay)
+    #         ],
+    #         "weight_decay": 0.0,
+    #     },
+    # ]
+    # if args.use_qlora:
+    #     from bitsandbytes.optim import AdamW
+
+    #     optimizer = AdamW(
+    #         optimizer_grouped_parameters,
+    #         lr=args.learning_rate,
+    #         optim_bits=8 if args.use_8bit_optimizer else 32,
+    #         is_paged=True,
+    #     )
+    # else:
+    #     optimizer = torch.optim.AdamW(
+    #         optimizer_grouped_parameters, lr=args.learning_rate
+    #     )
+
+    # # Scheduler and math around the number of training steps.
+    # overrode_max_train_steps = False
+    # num_update_steps_per_epoch = math.ceil(
+    #     len(train_dataloader) / args.gradient_accumulation_steps
+    # )
+    # if args.max_train_steps is None:
+    #     args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+    #     overrode_max_train_steps = True
+
+    # # Create the learning rate scheduler.
+    # # Note: the current accelerator.step() calls the .step() of the real scheduler for the `num_processes` times. This is because they assume
+    # # the user initialize the scheduler with the entire training set. In the case of data parallel training, each process only
+    # # sees a subset (1/num_processes) of the training set. So each time the process needs to update the lr multiple times so that the total
+    # # number of updates in the end matches the num_training_steps here.
+    # # Here we need to set the num_training_steps to either using the entire training set (when epochs is specified) or we need to multiply the
+    # # num_training_steps by num_processes so that the total number of updates matches the num_training_steps.
+    # num_training_steps_for_scheduler = (
+    #     args.max_train_steps
+    #     if overrode_max_train_steps
+    #     else args.max_train_steps * accelerator.num_processes
+    # )
+    # lr_scheduler = get_scheduler(
+    #     name=args.lr_scheduler_type,
+    #     optimizer=optimizer,
+    #     num_training_steps=num_training_steps_for_scheduler,
+    #     num_warmup_steps=int(num_training_steps_for_scheduler * args.warmup_ratio),
+    # )
+
+    # ***************************************************************
+    # *****************************************************************
+
+    print("model loaded. \n\n")
     sys.stdout.flush()
-    if (
-        "prompt" in raw_datasets["train"].column_names
-        and "completion" in raw_datasets["train"].column_names
-    ):
-        encode_function = partial(
-            encode_with_prompt_completion_format,
-            tokenizer=tokenizer,
-            max_seq_length=args.max_seq_length,
-        )
-    elif "messages" in raw_datasets["train"].column_names:
-        encode_function = partial(
-            encode_with_messages_format,
-            tokenizer=tokenizer,
-            max_seq_length=args.max_seq_length,
-        )
-    else:
-        raise ValueError(
-            "You need to have either 'prompt'&'completion' or 'messages' in your column names."
-        )
 
-    with accelerator.main_process_first():
-        lm_datasets = raw_datasets.map(
-            encode_function,
-            batched=False,
-            num_proc=args.preprocessing_num_workers,
-            load_from_cache_file=not args.overwrite_cache,
-            remove_columns=[
-                name
-                for name in raw_datasets["train"].column_names
-                if name not in ["input_ids", "labels", "attention_mask"]
-            ],
-            desc="Tokenizing and reformatting instruction data",
-        )
-
-        lm_datasets.set_format(type="pt")
-        lm_datasets = lm_datasets.filter(
-            lambda example: (example["labels"] != -100).any()
-        )
-
-    train_dataset = lm_datasets["train"]
-    print("finished preprocessing. \n\n")
-    sys.stdout.flush()
-
-    # Log a few random samples from the training set:
-    # for index in random.sample(range(len(train_dataset)), 3):
-    #    logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
-
-    # DataLoaders creation:
-    train_dataloader = DataLoader(
-        train_dataset,
-        shuffle=False,
-        # collate_fn=DataCollatorForSeq2Seq(
-        #     tokenizer=tokenizer, model=model, padding="longest"
-        # ),
-        collate_fn=DataCollatorForCausalLM(
-            tokenizer=tokenizer, max_seq_len=args.max_seq_length
-        ),
-        batch_size=args.per_device_train_batch_size,
+    tokenizer = get_tokenizer(
+        tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
     )
 
-    print(len(train_dataloader))
+    # ****************************************************************************
 
-
+    train_dataset = get_dataset_hf(
+        filepath=args.train_file,
+        data_name=args.dataset_name,
+        tokenizer=tokenizer,
+        max_seq_length=args.max_seq_length,
+        num_processes=6,
+        num_train_examples=None,
+        dataset_info=None,
+    )
+    # longest_seq_length_train, _ = get_longest_seq_length(train_dataset)
+    # model.max_seq_length = longest_seq_length_train
+    # print(
+    #     f"The longest sequence length in the train data is {longest_seq_length_train}, the model's maximum sequence length is"
+    #     f" {model.max_seq_length} and context length is {model.config.block_size}"
+    # )
+    sys.stdout.flush()
     val_dataset = get_mmlu_open_instruct(
-        filepath=args.test_file,
+        filepath=args.val_file,
         tokenizer=tokenizer,
         data_fold="val",
-        max_seq_length=args.max_seq_length,
+        max_seq_length=2048,
         num_processes=6,
         num_samples=None,
         subjects=None,
     )
+    test_dataset = None
+    if args.test_file is not None:
+        test_dataset = get_mmlu_open_instruct(
+            filepath=args.test_file,
+            tokenizer=tokenizer,
+            data_fold="test",
+            max_seq_length=2048,
+            num_processes=6,
+            num_samples=None,
+            subjects=None,
+        )
 
-    val_loader = DataLoader(
+    # ******************************************************************************************
+
+    train_loader, train_sampler = get_dataloader(
+        train_dataset,
+        args.per_device_train_batch_size,
+        tokenizer.pad_token_id,
+        max_seq_len=args.max_seq_length,
+        world_size=world_size,
+        shuffle=True,
+        num_processes=6,
+        return_sampler=True,
+    )
+
+    val_loader = get_dataloader(
         val_dataset,
+        args.per_device_eval_batch_size,
+        tokenizer.pad_token_id,
+        max_seq_len=2048,
+        world_size=world_size,
         shuffle=False,
-        collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
-        batch_size=args.per_device_eval_batch_size,
-    )
-
-    test_dataset = get_mmlu_open_instruct(
-        filepath=args.test_file,
-        tokenizer=tokenizer,
-        data_fold="test",
-        max_seq_length=args.max_seq_length,
         num_processes=6,
-        num_samples=None,
-        subjects=None,
     )
-
-    test_loader = DataLoader(
-        test_dataset,
-        shuffle=False,
-        collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
-        batch_size=args.per_device_eval_batch_size,
-    )
-    # Optimizer
-    # Split weights in two groups, one with weight decay and the other not.
-    no_decay = ["bias", "layer_norm.weight"]
-    optimizer_grouped_parameters = [
-        {
-            "params": [
-                p
-                for n, p in model.named_parameters()
-                if not any(nd in n for nd in no_decay)
-            ],
-            "weight_decay": args.weight_decay,
-        },
-        {
-            "params": [
-                p
-                for n, p in model.named_parameters()
-                if any(nd in n for nd in no_decay)
-            ],
-            "weight_decay": 0.0,
-        },
-    ]
-    if args.use_qlora:
-        from bitsandbytes.optim import AdamW
-
-        optimizer = AdamW(
-            optimizer_grouped_parameters,
-            lr=args.learning_rate,
-            optim_bits=8 if args.use_8bit_optimizer else 32,
-            is_paged=True,
-        )
-    else:
-        optimizer = torch.optim.AdamW(
-            optimizer_grouped_parameters, lr=args.learning_rate
+    test_loader = None
+    if test_dataset is not None:
+        test_loader = get_dataloader(
+            test_dataset,
+            args.per_device_eval_batch_size,
+            tokenizer.pad_token_id,
+            max_seq_len=2048,
+            world_size=world_size,
+            shuffle=False,
+            num_processes=6,
         )
 
-    # Scheduler and math around the number of training steps.
-    overrode_max_train_steps = False
-    num_update_steps_per_epoch = math.ceil(
-        len(train_dataloader) / args.gradient_accumulation_steps
-    )
-    if args.max_train_steps is None:
-        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
-        overrode_max_train_steps = True
+    # *******************************************************************************
 
-    # Create the learning rate scheduler.
-    # Note: the current accelerator.step() calls the .step() of the real scheduler for the `num_processes` times. This is because they assume
-    # the user initialize the scheduler with the entire training set. In the case of data parallel training, each process only
-    # sees a subset (1/num_processes) of the training set. So each time the process needs to update the lr multiple times so that the total
-    # number of updates in the end matches the num_training_steps here.
-    # Here we need to set the num_training_steps to either using the entire training set (when epochs is specified) or we need to multiply the
-    # num_training_steps by num_processes so that the total number of updates matches the num_training_steps.
-    num_training_steps_for_scheduler = (
-        args.max_train_steps
-        if overrode_max_train_steps
-        else args.max_train_steps * accelerator.num_processes
+    gradient_accumulation_iters = max(
+        1, int(args.batch_size / args.per_device_train_batch_size / world_size)
     )
+    optimizer = get_optimizer(
+        model=model,
+        learning_rate=args.learning_rate,
+        weight_decay=args.weight_decay,
+    )
+    # optimizer = fabric.setup_optimizers(optimizer)
     lr_scheduler = get_scheduler(
-        name=args.lr_scheduler_type,
-        optimizer=optimizer,
-        num_training_steps=num_training_steps_for_scheduler,
-        num_warmup_steps=int(num_training_steps_for_scheduler * args.warmup_ratio),
+        args.lr_scheduler_type,
+        optimizer,
+        epochs=args.num_train_epochs,
+        num_iters=len(train_loader),
+        warmup_steps=args.warmup_steps,
+        warmup_ratio=args.warmup_ratio,
+        gradient_accumulation_iters=gradient_accumulation_iters,
     )
+
+    # ************************************************************************
+    # ************************************************************************
 
     # Prepare everything with `accelerator`.
     model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
@@ -792,11 +916,20 @@ def main():
     )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
+    # num_update_steps_per_epoch = math.ceil(
+    #     len(train_dataloader) / args.gradient_accumulation_steps
+    # )
+    # if overrode_max_train_steps:
+    #     args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+    # # Afterwards we recalculate our number of training epochs
+    # args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
+
+    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
         len(train_dataloader) / args.gradient_accumulation_steps
     )
-    if overrode_max_train_steps:
-        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+
+    args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
@@ -816,11 +949,11 @@ def main():
         accelerator.init_trackers("open_instruct", experiment_config)
 
     # Train!
-    total_batch_size = (
-        args.per_device_train_batch_size
-        * accelerator.num_processes
-        * args.gradient_accumulation_steps
-    )
+    # total_batch_size = (
+    #     args.per_device_train_batch_size
+    #     * accelerator.num_processes
+    #     * args.gradient_accumulation_steps
+    # )
 
     # logger.info("***** Running training *****")
     # logger.info(f"  Num examples = {len(train_dataset)}")
@@ -835,9 +968,9 @@ def main():
     # logger.info(f"  Total optimization steps = {args.max_train_steps}")
 
     # Only show the progress bar once on each machine.
-    #progress_bar = tqdm(
+    # progress_bar = tqdm(
     #    range(args.max_train_steps), disable=not accelerator.is_local_main_process
-    #)
+    # )
     completed_steps = 0
     starting_epoch = 0
 
@@ -883,6 +1016,17 @@ def main():
 
     print_memory_consumed()
     print("before train run")
+
+    acc = evaluate(
+        model=model,
+        dataloader=test_loader,
+        tokenizer=tokenizer,
+        restrict_targets=True,
+    )
+    print(f"baseline average mmlu test accuracy: {acc:.4f}")
+    print_memory_consumed()
+    print("before after evaluate")
+
     for epoch in range(starting_epoch, args.num_train_epochs):
         acc = evaluate(
             model=model,
@@ -890,9 +1034,7 @@ def main():
             tokenizer=tokenizer,
             restrict_targets=True,
         )
-        print(f"baseline average mmlu test accuracy: {acc:.4f}")
-        print_memory_consumed()
-        print("before after evaluate")
+        print(f"baseline average mmlu val accuracy: {acc:.4f}")
 
         model.train()
         total_loss = 0
@@ -925,10 +1067,10 @@ def main():
 
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
-                #progress_bar.update(1)
+                # progress_bar.update(1)
                 completed_steps += 1
                 if args.logging_steps and completed_steps % args.logging_steps == 0:
-                    t_tot = time.time() -start
+                    t_tot = time.time() - start
 
                     avg_loss = (
                         accelerator.gather(total_loss).mean().item()
@@ -936,7 +1078,7 @@ def main():
                         / args.logging_steps
                     )
                     print(
-                            f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
+                        f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
                     )
                     sys.stdout.flush()
 
@@ -957,12 +1099,14 @@ def main():
                         tokenizer=tokenizer,
                         restrict_targets=True,
                     )
-                    t1 = time.time()-t0
+                    t1 = time.time() - t0
                     t_tot -= t1
-                    print(f"baseline average mmlu val accuracy: {acc:.4f}, time {t1/60: .2f} min")
+                    print(
+                        f"baseline average mmlu val accuracy: {acc:.4f}, time {t1/60: .2f} min"
+                    )
                     sys.stdout.flush()
 
-                #if isinstance(checkpointing_steps, int):
+                # if isinstance(checkpointing_steps, int):
                 #    if completed_steps % checkpointing_steps == 0:
                 #        output_dir = f"step_{completed_steps}"
                 #        if args.output_dir is not None:
@@ -974,7 +1118,17 @@ def main():
                 if completed_steps >= args.max_train_steps:
                     break
 
-        #if args.checkpointing_steps == "epoch":
+        acc = evaluate(
+            model=model,
+            dataloader=test_loader,
+            tokenizer=tokenizer,
+            restrict_targets=True,
+        )
+        print(f"test accuracy after epoch {epoch+1}: {acc:.4f}")
+        print_memory_consumed()
+        print("before after evaluate")
+
+        # if args.checkpointing_steps == "epoch":
         #    output_dir = f"epoch_{epoch}"
         #    if args.output_dir is not None:
         #        output_dir = os.path.join(args.output_dir, output_dir)
@@ -983,11 +1137,11 @@ def main():
     if args.with_tracking:
         accelerator.end_training()
 
-    if args.output_dir is not None:
-        accelerator.wait_for_everyone()
-        if accelerator.is_main_process:
-            tokenizer.save_pretrained(args.output_dir)
-        save_with_accelerate(accelerator, model, tokenizer, args.output_dir, args)
+    # if args.output_dir is not None:
+    #     accelerator.wait_for_everyone()
+    #     if accelerator.is_main_process:
+    #         tokenizer.save_pretrained(args.output_dir)
+    #     save_with_accelerate(accelerator, model, tokenizer, args.output_dir, args)
 
 
 # FSDP has issues with `inference_mode`
