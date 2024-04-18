@@ -9,9 +9,11 @@
 #SBATCH --job-name=test
 #SBATCH --gres=gpu:1 
 
-source /etc/profile.d/modules.sh
-module use /opt/nvidia/hpc_sdk/modulefiles/
-module load nvhpc
+#source /etc/profile.d/modules.sh
+#module use /opt/nvidia/hpc_sdk/modulefiles/
+#module load nvhpc
+
+
 source /u/area/ddoimo/anaconda3/bin/activate ./env_amd
 
 #conda activate ./env_amd
