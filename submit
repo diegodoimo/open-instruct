@@ -14,23 +14,22 @@
 #module load nvhpc
 source /u/area/ddoimo/anaconda3/bin/activate ./env_amd
 
-#conda activate ./env_amd
 export OMP_NUM_THREADS=32
-
-#export CUDA_VISIBLE_DEVICES=0,1,2,3
+export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True" 
 
 MODEL_SIZE=7B
 NUM_GPUS=1
 TOTAL_BATCH_SIZE=128
 BATCH_SIZE_PER_GPU=1
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
-#echo "Training llama model ${MODEL_SIZE} using $NUM_GPUS GPUs, $BATCH_SIZE_PER_GPU batch size per GPU, $GRADIENT_ACC_STEPS gradient accumulation steps"
+
 
 # Lora training
 accelerate launch \
     --mixed_precision bf16 \
     --num_machines 1 \
     --num_processes $NUM_GPUS \
+    --dynamo_backend 'no' \
     open_instruct/finetune.py \
     --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v1/models_hf/7B \
     --use_lora \
@@ -43,6 +42,7 @@ accelerate launch \
     --val_file /orfeo/cephfs/scratch/area/ddoimo/open/open-instruct/data/eval/mmlu \
     --test_file /orfeo/cephfs/scratch/area/ddoimo/open/open-instruct/data/eval/mmlu \
     --max_seq_length 1024 \
+    --batch_size $TOTAL_BATCH_SIZE \
     --preprocessing_num_workers 16 \
     --checkpointing_steps epoch \
     --per_device_train_batch_size 1 \

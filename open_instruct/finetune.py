@@ -204,10 +204,21 @@ def parse_args():
         ],
     )
     parser.add_argument(
+        "--batch_size",
+        type=int,
+        help="ratio of total training steps used for warmup.",
+    )
+    parser.add_argument(
+        "--warmup_steps",
+        type=int,
+        default=None,
+        help="ratio of total training steps used for warmup.",
+    )
+    parser.add_argument(
         "--warmup_ratio",
         type=float,
         default=0,
-        help="Ratio of total training steps used for warmup.",
+        help="ratio of total training steps used for warmup.",
     )
     parser.add_argument(
         "--output_dir", type=str, default=None, help="Where to store the final model."
@@ -488,7 +499,7 @@ def main():
     accelerator.wait_for_everyone()
 
     # ********************************************************
-    world_size = accelerator.num_processes()
+    world_size = accelerator.num_processes
 
     # *******************************************************
     # ********************************************************
@@ -912,7 +923,7 @@ def main():
 
     # Prepare everything with `accelerator`.
     model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        model, optimizer, train_dataloader, lr_scheduler
+        model, optimizer, train_loader, lr_scheduler
     )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
@@ -1017,15 +1028,15 @@ def main():
     print_memory_consumed()
     print("before train run")
 
-    acc = evaluate(
-        model=model,
-        dataloader=test_loader,
-        tokenizer=tokenizer,
-        restrict_targets=True,
-    )
-    print(f"baseline average mmlu test accuracy: {acc:.4f}")
-    print_memory_consumed()
-    print("before after evaluate")
+    #acc = evaluate(
+    #    model=model,
+    #    dataloader=test_loader,
+    #    tokenizer=tokenizer,
+    #    restrict_targets=True,
+    #)
+    #print(f"baseline average mmlu test accuracy: {acc:.4f}")
+    #print_memory_consumed()
+    #print("before after evaluate")
 
     for epoch in range(starting_epoch, args.num_train_epochs):
         acc = evaluate(
