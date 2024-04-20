@@ -514,23 +514,6 @@ def main():
             "You are instantiating a new config instance from scratch. This is not supported by this script."
         )
 
-    # if args.tokenizer_name:
-    #     tokenizer = AutoTokenizer.from_pretrained(
-    #         args.tokenizer_name, use_fast=not args.use_slow_tokenizer
-    #     )
-    # elif args.model_name_or_path:
-    #     tokenizer = AutoTokenizer.from_pretrained(
-    #         args.model_name_or_path, use_fast=not args.use_slow_tokenizer
-    #     )
-    # else:
-    #     raise ValueError(
-    #         "You are instantiating a new tokenizer from scratch. This is not supported by this script."
-    #         "You can do it from another script, save it, and load it from here, using --tokenizer_name."
-    #     )
-
-    # print("tokenizer loaded. \n\n")
-    # sys.stdout.flush()
-
     if args.model_name_or_path:
         if args.use_qlora:
             bnb_config = BitsAndBytesConfig(
@@ -569,8 +552,22 @@ def main():
         logger.info("Training new model from scratch")
         model = AutoModelForCausalLM.from_config(config)
 
-    print("model loaded. \n\n")
-    sys.stdout.flush()
+    # if args.tokenizer_name:
+    #     tokenizer = AutoTokenizer.from_pretrained(
+    #         args.tokenizer_name, use_fast=not args.use_slow_tokenizer
+    #     )
+    # elif args.model_name_or_path:
+    #     tokenizer = AutoTokenizer.from_pretrained(
+    #         args.model_name_or_path, use_fast=not args.use_slow_tokenizer
+    #     )
+    # else:
+    #     raise ValueError(
+    #         "You are instantiating a new tokenizer from scratch. This is not supported by this script."
+    #         "You can do it from another script, save it, and load it from here, using --tokenizer_name."
+    #     )
+
+    # print("tokenizer loaded. \n\n")
+    # sys.stdout.flush()
 
     # # no default pad token for llama!
     # # here we add all special tokens again, because the default ones are not in the special_tokens_map
@@ -610,6 +607,8 @@ def main():
     # print("model embedding resized. \n\n")
     # sys.stdout.flush()
 
+    print(config)
+
     if args.use_lora:
         if args.use_qlora:
             model = prepare_model_for_kbit_training(
@@ -636,98 +635,13 @@ def main():
         model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
 
-    # # DataLoaders creation:
-    # train_dataloader = DataLoader(
-    #     train_dataset,
-    #     shuffle=False,
-    #     # collate_fn=DataCollatorForSeq2Seq(
-    #     #     tokenizer=tokenizer, model=model, padding="longest"
-    #     # ),
-    #     collate_fn=DataCollatorForCausalLM(
-    #         tokenizer=tokenizer, max_seq_len=args.max_seq_length
-    #     ),
-    #     batch_size=args.per_device_train_batch_size,
-    # )
-    # print(len(train_dataloader))
-    # val_loader = DataLoader(
-    #     val_dataset,
-    #     shuffle=False,
-    #     collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
-    #     batch_size=args.per_device_eval_batch_size,
-    # )
-
-    # test_loader = DataLoader(
-    #     test_dataset,
-    #     shuffle=False,
-    #     collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
-    #     batch_size=args.per_device_eval_batch_size,
-    # )
-    # # Optimizer
-    # # Split weights in two groups, one with weight decay and the other not.
-    # no_decay = ["bias", "layer_norm.weight"]
-    # optimizer_grouped_parameters = [
-    #     {
-    #         "params": [
-    #             p
-    #             for n, p in model.named_parameters()
-    #             if not any(nd in n for nd in no_decay)
-    #         ],
-    #         "weight_decay": args.weight_decay,
-    #     },
-    #     {
-    #         "params": [
-    #             p
-    #             for n, p in model.named_parameters()
-    #             if any(nd in n for nd in no_decay)
-    #         ],
-    #         "weight_decay": 0.0,
-    #     },
-    # ]
-    # if args.use_qlora:
-    #     from bitsandbytes.optim import AdamW
-
-    #     optimizer = AdamW(
-    #         optimizer_grouped_parameters,
-    #         lr=args.learning_rate,
-    #         optim_bits=8 if args.use_8bit_optimizer else 32,
-    #         is_paged=True,
-    #     )
-    # else:
-    #     optimizer = torch.optim.AdamW(
-    #         optimizer_grouped_parameters, lr=args.learning_rate
-    #     )
-
-    # # Scheduler and math around the number of training steps.
-    # overrode_max_train_steps = False
-    # num_update_steps_per_epoch = math.ceil(
-    #     len(train_dataloader) / args.gradient_accumulation_steps
-    # )
-    # if args.max_train_steps is None:
-    #     args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
-    #     overrode_max_train_steps = True
-
-    # # Create the learning rate scheduler.
-    # # Note: the current accelerator.step() calls the .step() of the real scheduler for the `num_processes` times. This is because they assume
-    # # the user initialize the scheduler with the entire training set. In the case of data parallel training, each process only
-    # # sees a subset (1/num_processes) of the training set. So each time the process needs to update the lr multiple times so that the total
-    # # number of updates in the end matches the num_training_steps here.
-    # # Here we need to set the num_training_steps to either using the entire training set (when epochs is specified) or we need to multiply the
-    # # num_training_steps by num_processes so that the total number of updates matches the num_training_steps.
-    # num_training_steps_for_scheduler = (
-    #     args.max_train_steps
-    #     if overrode_max_train_steps
-    #     else args.max_train_steps * accelerator.num_processes
-    # )
-    # lr_scheduler = get_scheduler(
-    #     name=args.lr_scheduler_type,
-    #     optimizer=optimizer,
-    #     num_training_steps=num_training_steps_for_scheduler,
-    #     num_warmup_steps=int(num_training_steps_for_scheduler * args.warmup_ratio),
-    # )
-
     # ***************************************************************
     # *****************************************************************
+    model = accelerator.prepare(model)
+    print_memory_consumed()
+    sys.stdout.flush()
 
+    assert False
     print("model loaded. \n\n")
     sys.stdout.flush()
 
@@ -864,6 +778,33 @@ def main():
 
     # ******************************************************************************************
 
+    # # DataLoaders creation:
+    # train_dataloader = DataLoader(
+    #     train_dataset,
+    #     shuffle=False,
+    #     # collate_fn=DataCollatorForSeq2Seq(
+    #     #     tokenizer=tokenizer, model=model, padding="longest"
+    #     # ),
+    #     collate_fn=DataCollatorForCausalLM(
+    #         tokenizer=tokenizer, max_seq_len=args.max_seq_length
+    #     ),
+    #     batch_size=args.per_device_train_batch_size,
+    # )
+    # print(len(train_dataloader))
+    # val_loader = DataLoader(
+    #     val_dataset,
+    #     shuffle=False,
+    #     collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
+    #     batch_size=args.per_device_eval_batch_size,
+    # )
+
+    # test_loader = DataLoader(
+    #     test_dataset,
+    #     shuffle=False,
+    #     collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
+    #     batch_size=args.per_device_eval_batch_size,
+    # )
+
     train_loader, train_sampler = get_dataloader(
         train_dataset,
         args.per_device_train_batch_size,
@@ -897,6 +838,69 @@ def main():
         )
 
     # *******************************************************************************
+
+    # # Optimizer
+    # # Split weights in two groups, one with weight decay and the other not.
+    # no_decay = ["bias", "layer_norm.weight"]
+    # optimizer_grouped_parameters = [
+    #     {
+    #         "params": [
+    #             p
+    #             for n, p in model.named_parameters()
+    #             if not any(nd in n for nd in no_decay)
+    #         ],
+    #         "weight_decay": args.weight_decay,
+    #     },
+    #     {
+    #         "params": [
+    #             p
+    #             for n, p in model.named_parameters()
+    #             if any(nd in n for nd in no_decay)
+    #         ],
+    #         "weight_decay": 0.0,
+    #     },
+    # ]
+    # if args.use_qlora:
+    #     from bitsandbytes.optim import AdamW
+
+    #     optimizer = AdamW(
+    #         optimizer_grouped_parameters,
+    #         lr=args.learning_rate,
+    #         optim_bits=8 if args.use_8bit_optimizer else 32,
+    #         is_paged=True,
+    #     )
+    # else:
+    #     optimizer = torch.optim.AdamW(
+    #         optimizer_grouped_parameters, lr=args.learning_rate
+    #     )
+
+    # # Scheduler and math around the number of training steps.
+    # overrode_max_train_steps = False
+    # num_update_steps_per_epoch = math.ceil(
+    #     len(train_dataloader) / args.gradient_accumulation_steps
+    # )
+    # if args.max_train_steps is None:
+    #     args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+    #     overrode_max_train_steps = True
+
+    # # Create the learning rate scheduler.
+    # # Note: the current accelerator.step() calls the .step() of the real scheduler for the `num_processes` times. This is because they assume
+    # # the user initialize the scheduler with the entire training set. In the case of data parallel training, each process only
+    # # sees a subset (1/num_processes) of the training set. So each time the process needs to update the lr multiple times so that the total
+    # # number of updates in the end matches the num_training_steps here.
+    # # Here we need to set the num_training_steps to either using the entire training set (when epochs is specified) or we need to multiply the
+    # # num_training_steps by num_processes so that the total number of updates matches the num_training_steps.
+    # num_training_steps_for_scheduler = (
+    #     args.max_train_steps
+    #     if overrode_max_train_steps
+    #     else args.max_train_steps * accelerator.num_processes
+    # )
+    # lr_scheduler = get_scheduler(
+    #     name=args.lr_scheduler_type,
+    #     optimizer=optimizer,
+    #     num_training_steps=num_training_steps_for_scheduler,
+    #     num_warmup_steps=int(num_training_steps_for_scheduler * args.warmup_ratio),
+    # )
 
     gradient_accumulation_iters = max(
         1, int(args.batch_size / args.per_device_train_batch_size / world_size)
