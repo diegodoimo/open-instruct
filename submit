@@ -59,16 +59,4 @@ accelerate launch \
     --report_to tensorboard \
     --logging_steps 20 \
     --eval_steps 50
-    #--model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v1/models_hf/7B \
-    #--model_name_or_path  /u/area/ddoimo/ddoimo/llama/llama_v1/models_lit/llama-1-7b \
     #--eval_steps 50 &&
-
-#python open_instruct/merge_lora.py \
-#    --base_model_name_or_path ../hf_llama2_models/${MODEL_SIZE} \
-#    #--lora_model_name_or_path $RESULTS_FOLDER \
-#    --lora_name_or_path ./results/${MODEL_SIZE}_lora/ \
-#    --output_dir ./results/${MODEL_SIZE}_lora_merged/ \
-#    --save_tokenizer
-#--use_deepspeed \
-#--deepspeed_config_file ds_configs/stage3_no_offloading_accelerate.conf \
-#--use_flash_attn \
