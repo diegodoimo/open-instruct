@@ -47,6 +47,21 @@ from my_utils.dataloader_utils import get_dataloader
 from my_utils.optimizer_utils import get_optimizer, get_scheduler
 from my_utils.tokenizer_utils import get_tokenizer
 
+
+from accelerate import FullyShardedDataParallelPlugin
+from torch.distributed.fsdp import (
+    FullyShardedDataParallel as FSDP,
+    MixedPrecision,
+    ShardingStrategy,
+    BackwardPrefetch,
+)
+from torch.distributed.fsdp.wrap import (
+    transformer_auto_wrap_policy,
+    lambda_auto_wrap_policy,
+)
+from functools import partial
+from transformers.models.llama.modeling_llama import LlamaDecoderLayer
+
 # *******************************************************************
 
 
@@ -470,9 +485,54 @@ def main():
         accelerator_log_kwargs["log_with"] = args.report_to
         accelerator_log_kwargs["project_dir"] = args.output_dir
 
+    # os.environ["ACCELERATE_MIXED_PRECISION"] = args.precision
+
+    # # we use fsdp also when world size ==1. accelerate issue in casting
+    if int(os.environ["WORLD_SIZE"]) > 1:
+        os.environ["ACCELERATE_USE_FSDP"] = "true"
+
+    #     os.environ["FSDP_SHRDING_STRATEGY"] = "FULL_SHARD"
+    #     os.environ["FSDP_AUTO_WRAP_POLICY"] = "TRANSFORMER_BASED_WRAP"
+    #     os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = "LlamaDecoderLayer"
+
+    #     os.environ["FSDP_BACKWARD_PREFETCH"] = "BACKWARD_PRE"
+    #     os.environ["FSDP_STATE_DICT_TYPE"] = "SHARDED_STATE_DICT"
+    #     os.environ["FSDP_OFFLOAD_PARAMS"] = "false"
+
+    def lambda_fn(module: torch.nn.Module):
+        if isinstance(module, LlamaDecoderLayer):
+            return True  # like transformer_auto_wrap_policy
+        if isinstance(module, torch.nn.Linear) and all(
+            p.requires_grad for p in module.parameters()
+        ):
+            return True  # wrap each trainable linear separately
+        return False
+
+    auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
+
+    fsdp_plugin = FullyShardedDataParallelPlugin(
+        sharding_strategy=ShardingStrategy.FULL_SHARD,
+        backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
+        mixed_precision_policy=MixedPrecision(
+            param_dtype=torch.bfloat16,
+            reduce_dtype=torch.bfloat16,
+            buffer_dtype=torch.bfloat16,
+        ),
+        auto_wrap_policy=auto_wrap_policy,
+        cpu_offload=False,
+        ignored_modules=None,
+        limit_all_gathers=True,
+        use_orig_params=False,
+        param_init_fn=None,
+        sync_module_states=True,
+        forward_prefetch=False,
+        activation_checkpointing=False,
+    )
+
     accelerator = Accelerator(
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         **accelerator_log_kwargs,
+        fsdp_plugin=fsdp_plugin,
     )
     # Make one log on every process with the configuration for debugging.
     logging.basicConfig(
@@ -497,8 +557,6 @@ def main():
             os.makedirs(args.output_dir, exist_ok=True)
 
     accelerator.wait_for_everyone()
-
-    # ********************************************************
     world_size = accelerator.num_processes
 
     # *******************************************************
@@ -607,8 +665,6 @@ def main():
     # print("model embedding resized. \n\n")
     # sys.stdout.flush()
 
-    print(config)
-
     if args.use_lora:
         if args.use_qlora:
             model = prepare_model_for_kbit_training(
@@ -636,12 +692,7 @@ def main():
         model.print_trainable_parameters()
 
     # ***************************************************************
-    # *****************************************************************
-    model = accelerator.prepare(model)
-    print_memory_consumed()
-    sys.stdout.flush()
 
-    assert False
     print("model loaded. \n\n")
     sys.stdout.flush()
 
@@ -925,8 +976,10 @@ def main():
     # ************************************************************************
 
     # Prepare everything with `accelerator`.
-    model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        model, optimizer, train_loader, lr_scheduler
+    model = accelerator.prepare(model)
+
+    optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+        optimizer, train_loader, lr_scheduler
     )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
