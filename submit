@@ -5,9 +5,9 @@
 #SBATCH --time=6:00:00            
 #SBATCH --ntasks-per-node=1       
 #SBATCH --cpus-per-task=32           
-#SBATCH --mem=100G                
+#SBATCH --mem=80G                
 #SBATCH --job-name=test
-#SBATCH --gres=gpu:1 
+#SBATCH --gres=gpu:2 
 
 #source /etc/profile.d/modules.sh
 #module use /opt/nvidia/hpc_sdk/modulefiles/
@@ -18,7 +18,7 @@ export OMP_NUM_THREADS=32
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True" 
 
 MODEL_SIZE=7B
-NUM_GPUS=1
+NUM_GPUS=2
 TOTAL_BATCH_SIZE=128
 BATCH_SIZE_PER_GPU=1
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
@@ -45,6 +45,7 @@ accelerate launch \
     --batch_size $TOTAL_BATCH_SIZE \
     --preprocessing_num_workers 16 \
     --checkpointing_steps epoch \
+    --batch_size $TOTAL_BATCH_SIZE \
     --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps $GRADIENT_ACC_STEPS \
@@ -58,6 +59,8 @@ accelerate launch \
     --report_to tensorboard \
     --logging_steps 20 \
     --eval_steps 50
+    #--model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v1/models_hf/7B \
+    #--model_name_or_path  /u/area/ddoimo/ddoimo/llama/llama_v1/models_lit/llama-1-7b \
     #--eval_steps 50 &&
 
 #python open_instruct/merge_lora.py \
