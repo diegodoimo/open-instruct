@@ -16,6 +16,7 @@ disable_progress_bar()
 
 IGNORE_INDEX = -100
 
+
 def format_subject(subject):
     l = subject.split("_")
     s = ""
@@ -76,7 +77,7 @@ def encode_open_instruct_mmlu(
     }
 
 
-def get_mmlu_open_instruct(
+def get_mmlu_open_instruct_old(
     filepath,
     tokenizer,
     data_fold="val",

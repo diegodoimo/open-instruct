@@ -114,6 +114,75 @@ def get_dataset_hf(
 
 
 # ******************************************************************************
+def get_dataset_open_instruct_new(
+    accelerator,
+    filepath,
+    tokenizer,
+    max_seq_length=2048,
+    num_processes=1,
+):
+    # if args.dataset_name is not None:
+    #     # Downloading and loading a dataset from the hub.
+    #     raw_datasets = load_dataset(
+    #         args.dataset_name,
+    #         args.dataset_config_name,
+    #     )
+    # else:
+    data_files = {}
+    # dataset_args = {}
+    if filepath is not None:
+        data_files["train"] = filepath
+    raw_datasets = load_dataset(
+        "json",
+        data_files=data_files,
+        # **dataset_args,
+    )
+
+    print("start preprocessing the data. \n\n")
+    sys.stdout.flush()
+    if (
+        "prompt" in raw_datasets["train"].column_names
+        and "completion" in raw_datasets["train"].column_names
+    ):
+        encode_function = partial(
+            encode_with_prompt_completion_format,
+            tokenizer=tokenizer,
+            max_seq_length=max_seq_length,
+        )
+    elif "messages" in raw_datasets["train"].column_names:
+        encode_function = partial(
+            encode_with_messages_format,
+            tokenizer=tokenizer,
+            max_seq_length=max_seq_length,
+        )
+    else:
+        raise ValueError(
+            "You need to have either 'prompt'&'completion' or 'messages' in your column names."
+        )
+
+    with accelerator.main_process_first():
+        lm_datasets = raw_datasets.map(
+            encode_function,
+            batched=False,
+            num_proc=num_processes,
+            load_from_cache_file=False,
+            remove_columns=[
+                name
+                for name in raw_datasets["train"].column_names
+                if name not in ["input_ids", "labels", "attention_mask"]
+            ],
+            desc="Tokenizing and reformatting instruction data",
+        )
+
+        lm_datasets.set_format(type="pt")
+        lm_datasets = lm_datasets.filter(
+            lambda example: (example["labels"] != -100).any()
+        )
+
+    train_dataset = lm_datasets["train"]
+    print("finished preprocessing. \n\n")
+    sys.stdout.flush()
+    return train_dataset
 
 
 def get_dataset_open_intruct(
@@ -283,6 +352,9 @@ def get_mmlu_open_instruct(
         sys.stdout.flush()
 
     return lm_datasets
+
+
+# ******************************************************************************************
 
 
 def get_mmlu_qlora(mmlu_dir, tokenizer, protocol="fs"):

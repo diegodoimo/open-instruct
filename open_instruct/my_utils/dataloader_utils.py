@@ -12,7 +12,6 @@ def get_dataloader(
     dataset,
     batch_size,
     pad_token_id,
-    max_seq_len=2048,
     world_size=1,
     sampler=None,
     collate_fn=None,
@@ -22,9 +21,11 @@ def get_dataloader(
     return_sampler=False,
 ):
     if collate_fn is None:
-        collate_fn = DataCollatorForCausalLM(
-            pad_token_id=pad_token_id, max_seq_len=max_seq_len
-        )
+        # collate_fn = DataCollatorForCausalLM(
+        #     pad_token_id=pad_token_id, max_seq_len=max_seq_len
+        # )
+
+        collate_fn = DataCollatorForCausalLM(pad_token_id=pad_token_id)
 
     if world_size > 1:
         sampler = DistributedSampler(dataset, shuffle=False, drop_last=drop_last)
@@ -50,7 +51,7 @@ class DataCollatorForCausalLM:
     """Collate examples for supervised fine-tuning."""
 
     pad_token_id: int
-    max_seq_len: int
+    # max_seq_len: int
 
     # check if we can set padding value in labels == eos_token_id_directly (as the attention mask should take into account the gradient masking)
 
