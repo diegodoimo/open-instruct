@@ -75,7 +75,6 @@ def encode_with_prompt_completion_format(example, tokenizer, max_seq_length):
         return_tensors="pt",
         max_length=max_seq_length,
         truncation=True,
-        truncation_side="left",
     )
     input_ids = tokenized_example.input_ids
     labels = input_ids.clone()
@@ -84,7 +83,6 @@ def encode_with_prompt_completion_format(example, tokenizer, max_seq_length):
         return_tensors="pt",
         max_length=max_seq_length,
         truncation=True,
-        truncation_side="left",
     )
     # mask the prompt part for avoiding loss
     labels[:, : tokenized_prompt.input_ids.shape[1]] = -100
@@ -225,7 +223,6 @@ def encode_with_messages_format(example, tokenizer, max_seq_length):
                     return_tensors="pt",
                     max_length=max_seq_length,
                     truncation=True,
-                    trunctation_side="left",
                 ).input_ids.shape[1]
             if (
                 message_idx < len(messages) - 1

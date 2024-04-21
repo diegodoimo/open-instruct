@@ -1,3 +1,5 @@
+env_amd*
+data*
 cuda-repo-*
 env_amd
 output

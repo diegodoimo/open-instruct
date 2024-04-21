@@ -30,44 +30,21 @@ from transformers import (
     GPT2Tokenizer,
     OPTForCausalLM,
     BitsAndBytesConfig,
+    LlamaConfig,
 )
 from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
 
-from data_utils import get_mmlu_open_instruct_old, DataCollatorForCausalLM
+from data_utils import get_mmlu_open_instruct, DataCollatorForCausalLM
 import numpy as np
 import sys
 import time
+import warnings
 
 
-# *******************************************************************************
-from my_utils.dataloader_utils import get_dataloader
-from my_utils.helpers import print_memory_consumed
-from my_utils.dataset_utils import (
-    get_dataset_hf,
-    get_dataset_open_instruct_new,
-    get_mmlu_open_instruct,
+from lit_gpt.lora import GPT, Block, Config, lora_filter, mark_only_lora_as_trainable
+from lit_gpt.utils import (
+    num_parameters,
 )
-from my_utils.dataloader_utils import get_dataloader
-from my_utils.optimizer_utils import get_optimizer, get_scheduler
-from my_utils.tokenizer_utils import get_tokenizer
-from my_utils.model_utils import get_model_hf
-
-from accelerate import FullyShardedDataParallelPlugin
-from torch.distributed.fsdp import (
-    FullyShardedDataParallel as FSDP,
-    MixedPrecision,
-    ShardingStrategy,
-    BackwardPrefetch,
-)
-from torch.distributed.fsdp.wrap import (
-    transformer_auto_wrap_policy,
-    lambda_auto_wrap_policy,
-)
-from functools import partial
-from transformers.models.llama.modeling_llama import LlamaDecoderLayer
-
-
-# *******************************************************************
 
 
 logger = get_logger(__name__)
@@ -224,21 +201,10 @@ def parse_args():
         ],
     )
     parser.add_argument(
-        "--batch_size",
-        type=int,
-        help="ratio of total training steps used for warmup.",
-    )
-    parser.add_argument(
-        "--warmup_steps",
-        type=int,
-        default=None,
-        help="ratio of total training steps used for warmup.",
-    )
-    parser.add_argument(
         "--warmup_ratio",
         type=float,
         default=0,
-        help="ratio of total training steps used for warmup.",
+        help="Ratio of total training steps used for warmup.",
     )
     parser.add_argument(
         "--output_dir", type=str, default=None, help="Where to store the final model."
@@ -336,135 +302,146 @@ def parse_args():
     return args
 
 
-# def encode_with_prompt_completion_format(example, tokenizer, max_seq_length):
-#     """
-#     Here we assume each example has 'prompt' and 'completion' fields.
-#     We concatenate prompt and completion and tokenize them together because otherwise prompt will be padded/trancated
-#     and it doesn't make sense to follow directly with the completion.
-#     """
-#     # if prompt doesn't end with space and completion doesn't start with space, add space
-#     if not example["prompt"].endswith((" ", "\n", "\t")) and not example[
-#         "completion"
-#     ].startswith((" ", "\n", "\t")):
-#         example_text = example["prompt"] + " " + example["completion"]
-#     else:
-#         example_text = example["prompt"] + example["completion"]
-#     example_text = example_text + tokenizer.eos_token
-#     tokenized_example = tokenizer(
-#         example_text, return_tensors="pt", max_length=max_seq_length, truncation=True
-#     )
-#     input_ids = tokenized_example.input_ids
-#     labels = input_ids.clone()
-#     tokenized_prompt = tokenizer(
-#         example["prompt"],
-#         return_tensors="pt",
-#         max_length=max_seq_length,
-#         truncation=True,
-#     )
-#     # mask the prompt part for avoiding loss
-#     labels[:, : tokenized_prompt.input_ids.shape[1]] = -100
-#     attention_mask = torch.ones_like(input_ids)
-#     return {
-#         "input_ids": input_ids.flatten(),
-#         "labels": labels.flatten(),
-#         "attention_mask": attention_mask.flatten(),
-#     }
+def print_memory_consumed():
+    # rank = int(os.environ["RANK"])
+    torch.cuda.empty_cache()
+    allocated = torch.cuda.max_memory_allocated() / 2**30
+    reserved = torch.cuda.max_memory_reserved() / 2**30
+    # if rank == 0:
+    print(f"CUDA mem allocated: {allocated} GB")
+    print(f"CUDA mem reserved: {reserved} GB")
+    sys.stdout.flush()
 
 
-# def encode_with_messages_format(example, tokenizer, max_seq_length):
-#     """
-#     Here we assume each example has a 'messages' field Each message is a dict with 'role' and 'content' fields.
-#     We concatenate all messages with the roles as delimiters and tokenize them together.
-#     """
-#     messages = example["messages"]
-#     if len(messages) == 0:
-#         raise ValueError("messages field is empty.")
-
-#     def _concat_messages(messages):
-#         message_text = ""
-#         for message in messages:
-#             if message["role"] == "system":
-#                 message_text += "<|system|>\n" + message["content"].strip() + "\n"
-#             elif message["role"] == "user":
-#                 message_text += "<|user|>\n" + message["content"].strip() + "\n"
-#             elif message["role"] == "assistant":
-#                 message_text += (
-#                     "<|assistant|>\n"
-#                     + message["content"].strip()
-#                     + tokenizer.eos_token
-#                     + "\n"
-#                 )
-#             else:
-#                 raise ValueError("Invalid role: {}".format(message["role"]))
-#         return message_text
-
-#     example_text = _concat_messages(messages).strip()
-#     tokenized_example = tokenizer(
-#         example_text, return_tensors="pt", max_length=max_seq_length, truncation=True
-#     )
-#     input_ids = tokenized_example.input_ids
-#     labels = input_ids.clone()
-
-#     # mask the non-assistant part for avoiding loss
-#     for message_idx, message in enumerate(messages):
-#         if message["role"] != "assistant":
-#             if message_idx == 0:
-#                 message_start_idx = 0
-#             else:
-#                 message_start_idx = tokenizer(
-#                     _concat_messages(messages[:message_idx]),
-#                     return_tensors="pt",
-#                     max_length=max_seq_length,
-#                     truncation=True,
-#                 ).input_ids.shape[1]
-#             if (
-#                 message_idx < len(messages) - 1
-#                 and messages[message_idx + 1]["role"] == "assistant"
-#             ):
-#                 # here we also ignore the role of the assistant
-#                 messages_so_far = (
-#                     _concat_messages(messages[: message_idx + 1]) + "<|assistant|>\n"
-#                 )
-#             else:
-#                 messages_so_far = _concat_messages(messages[: message_idx + 1])
-#             message_end_idx = tokenizer(
-#                 messages_so_far,
-#                 return_tensors="pt",
-#                 max_length=max_seq_length,
-#                 truncation=True,
-#             ).input_ids.shape[1]
-#             labels[:, message_start_idx:message_end_idx] = -100
-
-#             if message_end_idx >= max_seq_length:
-#                 break
-
-#     attention_mask = torch.ones_like(input_ids)
-#     return {
-#         "input_ids": input_ids.flatten(),
-#         "labels": labels.flatten(),
-#         "attention_mask": attention_mask.flatten(),
-#     }
+def encode_with_prompt_completion_format(example, tokenizer, max_seq_length):
+    """
+    Here we assume each example has 'prompt' and 'completion' fields.
+    We concatenate prompt and completion and tokenize them together because otherwise prompt will be padded/trancated
+    and it doesn't make sense to follow directly with the completion.
+    """
+    # if prompt doesn't end with space and completion doesn't start with space, add space
+    if not example["prompt"].endswith((" ", "\n", "\t")) and not example[
+        "completion"
+    ].startswith((" ", "\n", "\t")):
+        example_text = example["prompt"] + " " + example["completion"]
+    else:
+        example_text = example["prompt"] + example["completion"]
+    example_text = example_text + tokenizer.eos_token
+    tokenized_example = tokenizer(
+        example_text, return_tensors="pt", max_length=max_seq_length, truncation=True
+    )
+    input_ids = tokenized_example.input_ids
+    labels = input_ids.clone()
+    tokenized_prompt = tokenizer(
+        example["prompt"],
+        return_tensors="pt",
+        max_length=max_seq_length,
+        truncation=True,
+    )
+    # mask the prompt part for avoiding loss
+    labels[:, : tokenized_prompt.input_ids.shape[1]] = -100
+    attention_mask = torch.ones_like(input_ids)
+    return {
+        "input_ids": input_ids.flatten(),
+        "labels": labels.flatten(),
+        "attention_mask": attention_mask.flatten(),
+    }
 
 
-# def save_with_accelerate(accelerator, model, tokenizer, output_dir, args):
-#     unwrapped_model = accelerator.unwrap_model(model)
-#     # When doing multi-gpu training, we need to use accelerator.get_state_dict(model) to get the state_dict.
-#     # Otherwise, sometimes the model will be saved with only part of the parameters.
-#     # Also, accelerator needs to use the wrapped model to get the state_dict.
-#     state_dict = accelerator.get_state_dict(model)
-#     if args.use_lora:
-#         # When using lora, the unwrapped model is a PeftModel, which doesn't support the is_main_process
-#         # and has its own save_pretrained function for only saving lora modules.
-#         # We have to manually specify the is_main_process outside the save_pretrained function.
-#         if accelerator.is_main_process:
-#             unwrapped_model.save_pretrained(output_dir, state_dict=state_dict)
-#     else:
-#         unwrapped_model.save_pretrained(
-#             output_dir,
-#             is_main_process=accelerator.is_main_process,
-#             save_function=accelerator.save,
-#             state_dict=state_dict,
-#         )
+def encode_with_messages_format(example, tokenizer, max_seq_length):
+    """
+    Here we assume each example has a 'messages' field Each message is a dict with 'role' and 'content' fields.
+    We concatenate all messages with the roles as delimiters and tokenize them together.
+    """
+    messages = example["messages"]
+    if len(messages) == 0:
+        raise ValueError("messages field is empty.")
+
+    def _concat_messages(messages):
+        message_text = ""
+        for message in messages:
+            if message["role"] == "system":
+                message_text += "<|system|>\n" + message["content"].strip() + "\n"
+            elif message["role"] == "user":
+                message_text += "<|user|>\n" + message["content"].strip() + "\n"
+            elif message["role"] == "assistant":
+                message_text += (
+                    "<|assistant|>\n"
+                    + message["content"].strip()
+                    + tokenizer.eos_token
+                    + "\n"
+                )
+            else:
+                raise ValueError("Invalid role: {}".format(message["role"]))
+        return message_text
+
+    example_text = _concat_messages(messages).strip()
+    tokenized_example = tokenizer(
+        example_text, return_tensors="pt", max_length=max_seq_length, truncation=True
+    )
+    input_ids = tokenized_example.input_ids
+    labels = input_ids.clone()
+
+    # mask the non-assistant part for avoiding loss
+    for message_idx, message in enumerate(messages):
+        if message["role"] != "assistant":
+            if message_idx == 0:
+                message_start_idx = 0
+            else:
+                message_start_idx = tokenizer(
+                    _concat_messages(messages[:message_idx]),
+                    return_tensors="pt",
+                    max_length=max_seq_length,
+                    truncation=True,
+                ).input_ids.shape[1]
+            if (
+                message_idx < len(messages) - 1
+                and messages[message_idx + 1]["role"] == "assistant"
+            ):
+                # here we also ignore the role of the assistant
+                messages_so_far = (
+                    _concat_messages(messages[: message_idx + 1]) + "<|assistant|>\n"
+                )
+            else:
+                messages_so_far = _concat_messages(messages[: message_idx + 1])
+            message_end_idx = tokenizer(
+                messages_so_far,
+                return_tensors="pt",
+                max_length=max_seq_length,
+                truncation=True,
+            ).input_ids.shape[1]
+            labels[:, message_start_idx:message_end_idx] = -100
+
+            if message_end_idx >= max_seq_length:
+                break
+
+    attention_mask = torch.ones_like(input_ids)
+    return {
+        "input_ids": input_ids.flatten(),
+        "labels": labels.flatten(),
+        "attention_mask": attention_mask.flatten(),
+    }
+
+
+def save_with_accelerate(accelerator, model, tokenizer, output_dir, args):
+    unwrapped_model = accelerator.unwrap_model(model)
+    # When doing multi-gpu training, we need to use accelerator.get_state_dict(model) to get the state_dict.
+    # Otherwise, sometimes the model will be saved with only part of the parameters.
+    # Also, accelerator needs to use the wrapped model to get the state_dict.
+    state_dict = accelerator.get_state_dict(model)
+    if args.use_lora:
+        # When using lora, the unwrapped model is a PeftModel, which doesn't support the is_main_process
+        # and has its own save_pretrained function for only saving lora modules.
+        # We have to manually specify the is_main_process outside the save_pretrained function.
+        if accelerator.is_main_process:
+            unwrapped_model.save_pretrained(output_dir, state_dict=state_dict)
+    else:
+        unwrapped_model.save_pretrained(
+            output_dir,
+            is_main_process=accelerator.is_main_process,
+            save_function=accelerator.save,
+            state_dict=state_dict,
+        )
 
 
 def main():
@@ -479,54 +456,9 @@ def main():
         accelerator_log_kwargs["log_with"] = args.report_to
         accelerator_log_kwargs["project_dir"] = args.output_dir
 
-    # os.environ["ACCELERATE_MIXED_PRECISION"] = args.precision
-
-    # # # we use fsdp also when world size ==1. accelerate issue in casting
-    # if int(os.environ["WORLD_SIZE"]) > 1:
-    #     os.environ["ACCELERATE_USE_FSDP"] = "true"
-
-    # #     os.environ["FSDP_SHRDING_STRATEGY"] = "FULL_SHARD"
-    # #     os.environ["FSDP_AUTO_WRAP_POLICY"] = "TRANSFORMER_BASED_WRAP"
-    # #     os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = "LlamaDecoderLayer"
-
-    # #     os.environ["FSDP_BACKWARD_PREFETCH"] = "BACKWARD_PRE"
-    # #     os.environ["FSDP_STATE_DICT_TYPE"] = "SHARDED_STATE_DICT"
-    # #     os.environ["FSDP_OFFLOAD_PARAMS"] = "false"
-
-    # def lambda_fn(module: torch.nn.Module):
-    #     if isinstance(module, LlamaDecoderLayer):
-    #         return True  # like transformer_auto_wrap_policy
-    #     if isinstance(module, torch.nn.Linear) and all(
-    #         p.requires_grad for p in module.parameters()
-    #     ):
-    #         return True  # wrap each trainable linear separately
-    #     return False
-
-    # auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
-
-    # fsdp_plugin = FullyShardedDataParallelPlugin(
-    #     sharding_strategy=ShardingStrategy.FULL_SHARD,
-    #     backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
-    #     mixed_precision_policy=MixedPrecision(
-    #         param_dtype=torch.bfloat16,
-    #         reduce_dtype=torch.bfloat16,
-    #         buffer_dtype=torch.bfloat16,
-    #     ),
-    #     auto_wrap_policy=auto_wrap_policy,
-    #     cpu_offload=False,
-    #     ignored_modules=None,
-    #     limit_all_gathers=True,
-    #     use_orig_params=False,
-    #     param_init_fn=None,
-    #     sync_module_states=True,
-    #     forward_prefetch=False,
-    #     activation_checkpointing=False,
-    # )
-
     accelerator = Accelerator(
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         **accelerator_log_kwargs,
-        # fsdp_plugin=fsdp_plugin,
     )
     # Make one log on every process with the configuration for debugging.
     logging.basicConfig(
@@ -551,32 +483,57 @@ def main():
             os.makedirs(args.output_dir, exist_ok=True)
 
     accelerator.wait_for_everyone()
-    world_size = accelerator.num_processes
 
-    # *******************************************************
-    # ********************************************************
+    if args.dataset_name is not None:
+        # Downloading and loading a dataset from the hub.
+        raw_datasets = load_dataset(
+            args.dataset_name,
+            args.dataset_config_name,
+        )
+    else:
+        data_files = {}
+        dataset_args = {}
+        if args.train_file is not None:
+            data_files["train"] = args.train_file
+        raw_datasets = load_dataset(
+            "json",
+            data_files=data_files,
+            **dataset_args,
+        )
 
-    model = get_model_hf(
-        accelerator=accelerator,
-        model_name_or_path=args.model_name_or_path,
-        config_name=args.config_name,
-        low_cpu_mem_usage=args.low_cpu_mem_usage,
-        torch_dtype=torch.bfloat16,
-        use_lora=args.use_lora,
-        lora_rank=args.lora_rank,
-        lora_alpha=args.lora_alpha,
-        lora_dropout=args.lora_dropout,
-        use_flash_attention=False,
-    )
-    # # Load pretrained model and tokenizer
-    # if args.config_name:
-    #     config = AutoConfig.from_pretrained(args.config_name)
-    # elif args.model_name_or_path:
-    #     config = AutoConfig.from_pretrained(args.model_name_or_path)
-    # else:
-    #     raise ValueError(
-    #         "You are instantiating a new config instance from scratch. This is not supported by this script."
-    #     )
+    # Load pretrained model and tokenizer
+    #if args.config_name:
+    #    config = AutoConfig.from_pretrained(args.config_name)
+    #elif args.model_name_or_path:
+    #    config = AutoConfig.from_pretrained(args.model_name_or_path)
+    #else:
+    #    warnings.warn("Using a fake llama for debugging\n", stacklevel=2)
+    #    config = LlamaConfig()
+    #    config.intermediate_size = 1000
+    #    config.num_hidden_layers = 3
+    #    config.num_attention_heads = 2
+    #    config.num_key_value_heads = 2
+    #    config.hidden_size = 500
+        # raise ValueError(
+        #     "You are instantiating a new config instance from scratch. This is not supported by this script."
+        # )
+
+    if args.tokenizer_name:
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.tokenizer_name, use_fast=not args.use_slow_tokenizer
+        )
+    elif args.model_name_or_path:
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_name_or_path, use_fast=not args.use_slow_tokenizer
+        )
+    else:
+        raise ValueError(
+            "You are instantiating a new tokenizer from scratch. This is not supported by this script."
+            "You can do it from another script, save it, and load it from here, using --tokenizer_name."
+        )
+
+    print("tokenizer loaded. \n\n")
+    sys.stdout.flush()
 
     # if args.model_name_or_path:
     #     if args.use_qlora:
@@ -642,90 +599,178 @@ def main():
     #     model = get_peft_model(model, peft_config)
     #     model.print_trainable_parameters()
 
-    # ***************************************************************
+    mine_to_lit = {
+        "laptop_llama": "laptop_llama",
+        "llama-1-7b": "Llama-1-7b-hf",
+        "llama-1-13b": "Llama-1-13b-hf",
+        "llama-1-30b": "Llama-1-30b-hf",
+        "llama-1-65b": "Llama-1-65b-hf",
+        "llama-2-7b": "Llama-2-7b-hf",
+        "llama-2-13b": "Llama-2-13b-hf",
+        "llama-2-70b": "Llama-2-70b-hf",
+        "llama-2-7b-chat": "Llama-2-7b-chat-hf",
+        "llama-2-13b-chat": "Llama-2-13b-chat-hf",
+        "llama-2-70b-chat": "Llama-2-70b-chat-hf",
+    }
+
+    model_name = mine_to_lit[args.model_name_or_path.split("/")[-1]]
+
+    config = Config.from_name(
+        name=model_name,
+        r=args.lora_rank,
+        alpha=args.lora_alpha,
+        dropout=args.lora_dropout,
+        to_query=True,
+        to_key=True,
+        to_value=True,
+        to_projection=True,
+        to_mlp=True,
+        to_head=False,
+    )
+
+    model = GPT(config)
+    model = model.to(dtype = torch.bfloat16)
+    mark_only_lora_as_trainable(model)
+
+    print(
+        f"Number of trainable parameters: {num_parameters(model, requires_grad=True):,}"
+    )
 
     print("model loaded. \n\n")
     sys.stdout.flush()
 
-    tokenizer = get_tokenizer(
-        tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
-    )
+    # no default pad token for llama!
+    # here we add all special tokens again, because the default ones are not in the special_tokens_map
+    if isinstance(tokenizer, LlamaTokenizer) or isinstance(
+        tokenizer, LlamaTokenizerFast
+    ):
+        num_added_tokens = tokenizer.add_special_tokens(
+            {
+                "bos_token": "<s>",
+                "eos_token": "</s>",
+                "unk_token": "<unk>",
+                "pad_token": "<pad>",
+            }
+        )
+        assert num_added_tokens in [
+            0,
+            1,
+        ], "LlamaTokenizer should only add one special token - the pad_token, or no tokens if pad token present."
+    elif isinstance(tokenizer, GPTNeoXTokenizerFast):
+        num_added_tokens = tokenizer.add_special_tokens(
+            {
+                "pad_token": "<pad>",
+            }
+        )
+        assert (
+            num_added_tokens == 1
+        ), "GPTNeoXTokenizer should only add one special token - the pad_token."
+    elif isinstance(tokenizer, GPT2Tokenizer) and isinstance(model, OPTForCausalLM):
+        num_added_tokens = tokenizer.add_special_tokens({"unk_token": "<unk>"})
 
-    # ****************************************************************************
+    # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
+    # on a small vocab and want a smaller embedding size, remove this test.
+    # embedding_size = model.get_input_embeddings().weight.shape[0]
+    # if len(tokenizer) > embedding_size:
+    #     model.resize_token_embeddings(len(tokenizer))
 
-    # # Preprocessing the datasets.
-
-    # if args.dataset_name is not None:
-    #     # Downloading and loading a dataset from the hub.
-    #     raw_datasets = load_dataset(
-    #         args.dataset_name,
-    #         args.dataset_config_name,
-    #     )
-    # else:
-    #     data_files = {}
-    #     dataset_args = {}
-    #     if args.train_file is not None:
-    #         data_files["train"] = args.train_file
-    #     raw_datasets = load_dataset(
-    #         "json",
-    #         data_files=data_files,
-    #         **dataset_args,
-    #     )
-
-    # print("start preprocessing the data. \n\n")
-    # sys.stdout.flush()
-    # if (
-    #     "prompt" in raw_datasets["train"].column_names
-    #     and "completion" in raw_datasets["train"].column_names
-    # ):
-    #     encode_function = partial(
-    #         encode_with_prompt_completion_format,
-    #         tokenizer=tokenizer,
-    #         max_seq_length=args.max_seq_length,
-    #     )
-    # elif "messages" in raw_datasets["train"].column_names:
-    #     encode_function = partial(
-    #         encode_with_messages_format,
-    #         tokenizer=tokenizer,
-    #         max_seq_length=args.max_seq_length,
-    #     )
-    # else:
-    #     raise ValueError(
-    #         "You need to have either 'prompt'&'completion' or 'messages' in your column names."
-    #     )
-
-    # with accelerator.main_process_first():
-    #     lm_datasets = raw_datasets.map(
-    #         encode_function,
-    #         batched=False,
-    #         num_proc=args.preprocessing_num_workers,
-    #         load_from_cache_file=not args.overwrite_cache,
-    #         remove_columns=[
-    #             name
-    #             for name in raw_datasets["train"].column_names
-    #             if name not in ["input_ids", "labels", "attention_mask"]
-    #         ],
-    #         desc="Tokenizing and reformatting instruction data",
-    #     )
-
-    #     lm_datasets.set_format(type="pt")
-    #     lm_datasets = lm_datasets.filter(
-    #         lambda example: (example["labels"] != -100).any()
-    #     )
-
-    # train_dataset = lm_datasets["train"]
-    # print("finished preprocessing. \n\n")
+    # print("model embedding resized. \n\n")
     # sys.stdout.flush()
 
-    train_dataset = get_dataset_open_instruct_new(
-        accelerator=accelerator,
-        filepath=args.train_file,
-        tokenizer=tokenizer,
-        max_seq_length=2048,
-        num_processes=1,
+    # tokenizer.pad_token = "<pad>"
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+
+    # for name, param in model.named_parameters():
+    #     print(name)
+    #     if param.requires_grad:
+    #         print(name)
+
+    # def bp_hooks(model, names):
+    #     def get_hook(name):
+    #         def hook_fn(model, grad_input, grad_output):
+    #             torch.save(grad_input, f"./results/{name}_grad_input_hf.pt")
+    #             torch.save(grad_output, f"./results/{name}_grad_output_hf.pt")
+    #             print(f"grad_output {name}", grad_output)
+    #             print(f"grad_input {name}", grad_input)
+
+    #         return hook_fn
+
+    #     for name, module in model.named_modules():
+    #         if name in names:
+    #             module.register_full_backward_hook(get_hook(name))
+
+    # names = [
+    #     "base_model.model.lm_head",
+    #     "base_model.model.model.norm",
+    #     # "_forward_module.transformer.h.2.mlp.proj.lora_B",
+    #     # "_forward_module.transformer.h.2.mlp.proj.lora_A",
+    # ]
+    # bp_hooks(model, names)
+
+    # Preprocessing the datasets.
+    print("start preprocessing the data. \n\n")
+    sys.stdout.flush()
+    if (
+        "prompt" in raw_datasets["train"].column_names
+        and "completion" in raw_datasets["train"].column_names
+    ):
+        encode_function = partial(
+            encode_with_prompt_completion_format,
+            tokenizer=tokenizer,
+            max_seq_length=args.max_seq_length,
+        )
+    elif "messages" in raw_datasets["train"].column_names:
+        encode_function = partial(
+            encode_with_messages_format,
+            tokenizer=tokenizer,
+            max_seq_length=args.max_seq_length,
+        )
+    else:
+        raise ValueError(
+            "You need to have either 'prompt'&'completion' or 'messages' in your column names."
+        )
+
+    with accelerator.main_process_first():
+        lm_datasets = raw_datasets.map(
+            encode_function,
+            batched=False,
+            num_proc=args.preprocessing_num_workers,
+            load_from_cache_file=not args.overwrite_cache,
+            remove_columns=[
+                name
+                for name in raw_datasets["train"].column_names
+                if name not in ["input_ids", "labels", "attention_mask"]
+            ],
+            desc="Tokenizing and reformatting instruction data",
+        )
+
+        lm_datasets.set_format(type="pt")
+        lm_datasets = lm_datasets.filter(
+            lambda example: (example["labels"] != -100).any()
+        )
+
+    train_dataset = lm_datasets["train"]
+    print("finished preprocessing. \n\n")
+    sys.stdout.flush()
+
+    # Log a few random samples from the training set:
+    # for index in random.sample(range(len(train_dataset)), 3):
+    #    logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
+
+    # DataLoaders creation:
+    train_dataloader = DataLoader(
+        train_dataset,
+        shuffle=False,
+        # collate_fn=DataCollatorForSeq2Seq(
+        #     tokenizer=tokenizer, model=model, padding="longest"
+        # ),
+        collate_fn=DataCollatorForCausalLM(
+            tokenizer=tokenizer, max_seq_len=args.max_seq_length
+        ),
+        batch_size=args.per_device_train_batch_size,
     )
 
-    val_dataset = get_mmlu_open_instruct_old(
+    val_dataset = get_mmlu_open_instruct(
         filepath=args.test_file,
         tokenizer=tokenizer,
         data_fold="val",
@@ -735,7 +780,14 @@ def main():
         subjects=None,
     )
 
-    test_dataset = get_mmlu_open_instruct_old(
+    val_loader = DataLoader(
+        val_dataset,
+        shuffle=False,
+        collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
+        batch_size=args.per_device_eval_batch_size,
+    )
+
+    test_dataset = get_mmlu_open_instruct(
         filepath=args.test_file,
         tokenizer=tokenizer,
         data_fold="test",
@@ -745,172 +797,86 @@ def main():
         subjects=None,
     )
 
-    # ******************************************************************************************
-
-    # # DataLoaders creation:
-    # train_dataloader = DataLoader(
-    #     train_dataset,
-    #     shuffle=False,
-    #     # collate_fn=DataCollatorForSeq2Seq(
-    #     #     tokenizer=tokenizer, model=model, padding="longest"
-    #     # ),
-    #     collate_fn=DataCollatorForCausalLM(
-    #         tokenizer=tokenizer, max_seq_len=args.max_seq_length
-    #     ),
-    #     batch_size=args.per_device_train_batch_size,
-    # )
-    # print(len(train_dataloader))
-    # val_loader = DataLoader(
-    #     val_dataset,
-    #     shuffle=False,
-    #     collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
-    #     batch_size=args.per_device_eval_batch_size,
-    # )
-
-    # test_loader = DataLoader(
-    #     test_dataset,
-    #     shuffle=False,
-    #     collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
-    #     batch_size=args.per_device_eval_batch_size,
-    # )
-
-    train_loader, train_sampler = get_dataloader(
-        train_dataset,
-        args.per_device_train_batch_size,
-        tokenizer.pad_token_id,
-        world_size=world_size,
-        shuffle=True,
-        num_processes=6,
-        return_sampler=True,
-    )
-
-    val_loader = get_dataloader(
-        val_dataset,
-        args.per_device_eval_batch_size,
-        tokenizer.pad_token_id,
-        world_size=world_size,
+    test_loader = DataLoader(
+        test_dataset,
         shuffle=False,
-        num_processes=6,
+        collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
+        batch_size=args.per_device_eval_batch_size,
     )
-    test_loader = None
-    if test_dataset is not None:
-        test_loader = get_dataloader(
-            test_dataset,
-            args.per_device_eval_batch_size,
-            tokenizer.pad_token_id,
-            world_size=world_size,
-            shuffle=False,
-            num_processes=6,
+    # Optimizer
+    # Split weights in two groups, one with weight decay and the other not.
+    no_decay = ["bias", "layer_norm.weight"]
+    optimizer_grouped_parameters = [
+        {
+            "params": [
+                p
+                for n, p in model.named_parameters()
+                if not any(nd in n for nd in no_decay)
+            ],
+            "weight_decay": args.weight_decay,
+        },
+        {
+            "params": [
+                p
+                for n, p in model.named_parameters()
+                if any(nd in n for nd in no_decay)
+            ],
+            "weight_decay": 0.0,
+        },
+    ]
+    if args.use_qlora:
+        from bitsandbytes.optim import AdamW
+
+        optimizer = AdamW(
+            optimizer_grouped_parameters,
+            lr=args.learning_rate,
+            optim_bits=8 if args.use_8bit_optimizer else 32,
+            is_paged=True,
+        )
+    else:
+        optimizer = torch.optim.AdamW(
+            optimizer_grouped_parameters, lr=args.learning_rate
         )
 
-    # *******************************************************************************
-
-    # # Optimizer
-    # # Split weights in two groups, one with weight decay and the other not.
-    # no_decay = ["bias", "layer_norm.weight"]
-    # optimizer_grouped_parameters = [
-    #     {
-    #         "params": [
-    #             p
-    #             for n, p in model.named_parameters()
-    #             if not any(nd in n for nd in no_decay)
-    #         ],
-    #         "weight_decay": args.weight_decay,
-    #     },
-    #     {
-    #         "params": [
-    #             p
-    #             for n, p in model.named_parameters()
-    #             if any(nd in n for nd in no_decay)
-    #         ],
-    #         "weight_decay": 0.0,
-    #     },
-    # ]
-    # if args.use_qlora:
-    #     from bitsandbytes.optim import AdamW
-
-    #     optimizer = AdamW(
-    #         optimizer_grouped_parameters,
-    #         lr=args.learning_rate,
-    #         optim_bits=8 if args.use_8bit_optimizer else 32,
-    #         is_paged=True,
-    #     )
-    # else:
-    #     optimizer = torch.optim.AdamW(
-    #         optimizer_grouped_parameters, lr=args.learning_rate
-    #     )
-
-    # # Scheduler and math around the number of training steps.
-    # overrode_max_train_steps = False
-    # num_update_steps_per_epoch = math.ceil(
-    #     len(train_dataloader) / args.gradient_accumulation_steps
-    # )
-    # if args.max_train_steps is None:
-    #     args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
-    #     overrode_max_train_steps = True
-
-    # # Create the learning rate scheduler.
-    # # Note: the current accelerator.step() calls the .step() of the real scheduler for the `num_processes` times. This is because they assume
-    # # the user initialize the scheduler with the entire training set. In the case of data parallel training, each process only
-    # # sees a subset (1/num_processes) of the training set. So each time the process needs to update the lr multiple times so that the total
-    # # number of updates in the end matches the num_training_steps here.
-    # # Here we need to set the num_training_steps to either using the entire training set (when epochs is specified) or we need to multiply the
-    # # num_training_steps by num_processes so that the total number of updates matches the num_training_steps.
-    # num_training_steps_for_scheduler = (
-    #     args.max_train_steps
-    #     if overrode_max_train_steps
-    #     else args.max_train_steps * accelerator.num_processes
-    # )
-    # lr_scheduler = get_scheduler(
-    #     name=args.lr_scheduler_type,
-    #     optimizer=optimizer,
-    #     num_training_steps=num_training_steps_for_scheduler,
-    #     num_warmup_steps=int(num_training_steps_for_scheduler * args.warmup_ratio),
-    # )
-
-    gradient_accumulation_iters = max(
-        1, int(args.batch_size / args.per_device_train_batch_size / world_size)
+    # Scheduler and math around the number of training steps.
+    overrode_max_train_steps = False
+    num_update_steps_per_epoch = math.ceil(
+        len(train_dataloader) / args.gradient_accumulation_steps
     )
-    optimizer = get_optimizer(
-        model=model,
-        learning_rate=args.learning_rate,
-        weight_decay=args.weight_decay,
+    if args.max_train_steps is None:
+        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+        overrode_max_train_steps = True
+
+    # Create the learning rate scheduler.
+    # Note: the current accelerator.step() calls the .step() of the real scheduler for the `num_processes` times. This is because they assume
+    # the user initialize the scheduler with the entire training set. In the case of data parallel training, each process only
+    # sees a subset (1/num_processes) of the training set. So each time the process needs to update the lr multiple times so that the total
+    # number of updates in the end matches the num_training_steps here.
+    # Here we need to set the num_training_steps to either using the entire training set (when epochs is specified) or we need to multiply the
+    # num_training_steps by num_processes so that the total number of updates matches the num_training_steps.
+    num_training_steps_for_scheduler = (
+        args.max_train_steps
+        if overrode_max_train_steps
+        else args.max_train_steps * accelerator.num_processes
     )
-    # optimizer = fabric.setup_optimizers(optimizer)
     lr_scheduler = get_scheduler(
-        args.lr_scheduler_type,
-        optimizer,
-        epochs=args.num_train_epochs,
-        num_iters=len(train_loader),
-        warmup_steps=args.warmup_steps,
-        warmup_ratio=args.warmup_ratio,
-        gradient_accumulation_iters=gradient_accumulation_iters,
+        name=args.lr_scheduler_type,
+        optimizer=optimizer,
+        num_training_steps=num_training_steps_for_scheduler,
+        num_warmup_steps=int(num_training_steps_for_scheduler * args.warmup_ratio),
     )
-
-    # ************************************************************************
-    # ************************************************************************
 
     # Prepare everything with `accelerator`.
-    model = accelerator.prepare(model)
-    optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        optimizer, train_loader, lr_scheduler
+    model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+        model, optimizer, train_dataloader, lr_scheduler
     )
-
-    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    # num_update_steps_per_epoch = math.ceil(
-    #     len(train_dataloader) / args.gradient_accumulation_steps
-    # )
-    # if overrode_max_train_steps:
-    #     args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
-    # # Afterwards we recalculate our number of training epochs
-    # args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
         len(train_dataloader) / args.gradient_accumulation_steps
     )
-
-    args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+    if overrode_max_train_steps:
+        args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
@@ -930,11 +896,11 @@ def main():
         accelerator.init_trackers("open_instruct", experiment_config)
 
     # Train!
-    # total_batch_size = (
-    #     args.per_device_train_batch_size
-    #     * accelerator.num_processes
-    #     * args.gradient_accumulation_steps
-    # )
+    total_batch_size = (
+        args.per_device_train_batch_size
+        * accelerator.num_processes
+        * args.gradient_accumulation_steps
+    )
 
     # logger.info("***** Running training *****")
     # logger.info(f"  Num examples = {len(train_dataset)}")
@@ -998,24 +964,17 @@ def main():
     print_memory_consumed()
     print("before train run")
 
-    # acc = evaluate(
-    #    model=model,
-    #    dataloader=test_loader,
-    #    tokenizer=tokenizer,
-    #    restrict_targets=True,
-    # )
-    # print(f"baseline average mmlu test accuracy: {acc:.4f}")
-    # print_memory_consumed()
-    # print("before after evaluate")
-
+    crit = torch.nn.CrossEntropyLoss()
     for epoch in range(starting_epoch, args.num_train_epochs):
         acc = evaluate(
-            model=model,
-            dataloader=val_loader,
+           model=model,
+            dataloader=test_loader,
             tokenizer=tokenizer,
-            restrict_targets=True,
+           restrict_targets=True,
         )
-        print(f"baseline average mmlu val accuracy: {acc:.4f}")
+        print(f"baseline average mmlu test accuracy: {acc:.4f}")
+        print_memory_consumed()
+        # print("before after evaluate")
 
         model.train()
         total_loss = 0
@@ -1030,21 +989,98 @@ def main():
             )
         else:
             active_dataloader = train_dataloader
-        print("tot iter:", len(active_dataloader))
+        # print("tot iter:", len(active_dataloader))
         start = time.time()
         for step, batch in enumerate(active_dataloader):
             with accelerator.accumulate(model):
-                outputs = model(**batch, use_cache=False)
-                loss = outputs.loss
+                input_ids, targets, _ = (
+                    batch["input_ids"],
+                    batch["labels"],
+                    batch["attention_mask"],
+                )
+                input_ids = input_ids.to("cuda")
+                targets = targets.to("cuda")
+                logits = model(input_ids)  # , lm_head_chunk_size=128)
+
+                logits = logits[..., :-1, :]
+                shift_logits = logits.view(
+                    -1, logits.shape[-1]
+                )  # self.config.vocab_size)
+                shift_labels = targets[..., 1:]
+                shift_labels = shift_labels.view(-1)
+                loss = crit(shift_logits, shift_labels)
+
+                # outputs = model(**batch, use_cache=False)
+                # loss = outputs.loss
                 # We keep track of the loss at each logged step
                 total_loss += loss.detach().float()
+
+                # print("loss:", loss)
+
+                # print("input_ids:", batch["input_ids"])
+                # print("logits:", outputs.logits)
+                # grad0 = model.base_model.model.model.layers[
+                #     0
+                # ].self_attn.q_proj.lora_A.default.weight.grad
+                # print("grad: ", grad0)
+                # grad1 = model.base_model.model.model.layers[
+                #     0
+                # ].mlp.down_proj.lora_B.default.weight.grad
+
                 accelerator.backward(loss)
+                # print("grad: ", model.model.model.embed_tokens.weight.grad)
+                # print("out: ", model.model.lm_head.weight.grad)
                 # clip gradient norm. don't do this with deepspeed
                 if accelerator.sync_gradients and args.clip_grad_norm > 0:
                     accelerator.clip_grad_norm_(model.parameters(), args.clip_grad_norm)
                 optimizer.step()
                 optimizer.zero_grad()
                 lr_scheduler.step()
+
+                # print("after optimizer step")
+                # print(
+                #     "h31_loraA: ",
+                #     model.base_model.model.model.layers[
+                #         31
+                #     ].self_attn.q_proj.lora_A.default.weight.grad,
+                # )
+                # print(
+                #     "h31s_loraB: ",
+                #     model.base_model.model.model.layers[
+                #         31
+                #     ].self_attn.q_proj.lora_B.default.weight.grad
+                # )
+                # print(
+                #     "h0_loraA: ",
+                #     model.base_model.model.model.layers[
+                #         0
+                #     ].self_attn.q_proj.lora_A.default.weight.grad,
+                # )
+                # print(
+                #     "h0_loraB: ",
+                #     model.base_model.model.model.layers[
+                #         0
+                #     ].self_attn.q_proj.lora_B.default.weight.grad,
+                # )
+
+            # if accelerator.sync_gradients:
+            # print("input_ids:", batch["input_ids"])
+            # print("logits:", outputs.logits)
+            # grad0 = model.base_model.model.model.layers[
+            #     0
+            # ].self_attn.q_proj.lora_A.default.weight.grad
+            # print("grad: ", grad0)
+            # grad1 = model.base_model.model.model.layers[
+            #     31
+            # ].mlp.down_proj.lora_B.default.weight.grad
+
+            # print("out: ", grad1)
+            # torch.save(
+            #     batch["input_ids"].to("cpu"), f"{args.output_dir}/input_ids_hf"
+            # )
+            # torch.save(outputs.logits.to("cpu"), f"{args.output_dir}/logits_hf")
+            # torch.save(grad0.to("cpu"), f"{args.output_dir}/lorab_in_hf")
+            # torch.save(grad1.to("cpu"), f"{args.output_dir}/lorab_out_hf")
 
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
@@ -1099,30 +1135,23 @@ def main():
                 if completed_steps >= args.max_train_steps:
                     break
 
-        acc = evaluate(
-            model=model,
-            dataloader=test_loader,
-            tokenizer=tokenizer,
-            restrict_targets=True,
-        )
-        print(f"test accuracy after epoch {epoch+1}: {acc:.4f}")
-        print_memory_consumed()
-        print("before after evaluate")
-
         # if args.checkpointing_steps == "epoch":
         #    output_dir = f"epoch_{epoch}"
         #    if args.output_dir is not None:
         #        output_dir = os.path.join(args.output_dir, output_dir)
         #    save_with_accelerate(accelerator, model, tokenizer, output_dir, args)
 
-    if args.with_tracking:
-        accelerator.end_training()
+    # if args.with_tracking:
+    #     accelerator.end_training()
 
     # if args.output_dir is not None:
     #     accelerator.wait_for_everyone()
     #     if accelerator.is_main_process:
     #         tokenizer.save_pretrained(args.output_dir)
     #     save_with_accelerate(accelerator, model, tokenizer, args.output_dir, args)
+
+
+# *************************************************************************************************
 
 
 # FSDP has issues with `inference_mode`
@@ -1157,8 +1186,9 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
             batch["attention_mask"],
         )
         input_ids = input_ids.to("cuda")
-        outputs = model(input_ids)
-        logits = outputs.logits
+        logits = model(input_ids)
+
+        # logits = outputs.logits
 
         seq_len = torch.sum(mask, dim=1)
         batch_probs = torch.softmax(
@@ -1189,4 +1219,3 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
 if __name__ == "__main__":
     main()
-

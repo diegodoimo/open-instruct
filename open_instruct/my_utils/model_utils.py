@@ -16,9 +16,6 @@ wd = Path(__file__).parent.parent.resolve()
 sys.path.append(str(wd))
 
 
-WORLD_SIZE = int(os.environ["WORLD_SIZE"])
-
-
 def get_model_hf(
     accelerator,
     model_name_or_path,
@@ -53,15 +50,15 @@ def get_model_hf(
             torch_dtype=torch_dtype,
             use_flash_attention_2=True if use_flash_attention else False,
         )
-        print("model loading finished. \n\n")
+        accelerator.print("model loading finished. \n\n")
         sys.stdout.flush()
     else:
-        logger.info("Training new model from scratch")
+        accelerator.print("Training new model from scratch")
         model = AutoModelForCausalLM.from_config(config)
 
     if use_lora:
 
-        logger.info("Initializing LORA model...")
+        accelerator.print("Initializing LORA model...")
         peft_config = LoraConfig(
             task_type=TaskType.CAUSAL_LM,
             inference_mode=False,
