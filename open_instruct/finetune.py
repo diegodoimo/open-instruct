@@ -488,7 +488,7 @@ def main():
     # os.environ["ACCELERATE_MIXED_PRECISION"] = args.precision
 
     # # we use fsdp also when world size ==1. accelerate issue in casting
-    if int(os.environ["WORLD_SIZE"]) > 1:
+    if int(os.environ["WORLD_SIZE"]) > 0:
         os.environ["ACCELERATE_USE_FSDP"] = "true"
 
     #     os.environ["FSDP_SHRDING_STRATEGY"] = "FULL_SHARD"
@@ -501,11 +501,11 @@ def main():
 
     def lambda_fn(module: torch.nn.Module):
         if isinstance(module, LlamaDecoderLayer):
-            return True  # like transformer_auto_wrap_policy
+            return None  # like transformer_auto_wrap_policy
         if isinstance(module, torch.nn.Linear) and all(
             p.requires_grad for p in module.parameters()
         ):
-            return True  # wrap each trainable linear separately
+            return None  # wrap each trainable linear separately
         return False
 
     auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
@@ -526,7 +526,6 @@ def main():
         param_init_fn=None,
         sync_module_states=True,
         forward_prefetch=False,
-        activation_checkpointing=False,
     )
 
     accelerator = Accelerator(
@@ -977,6 +976,12 @@ def main():
 
     # Prepare everything with `accelerator`.
     model = accelerator.prepare(model)
+    print(model)
+    for name, param in model.named_parameters():
+        print(name, param.dtype)
+    print_memory_consumed()
+    
+    assert False
 
     optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         optimizer, train_loader, lr_scheduler
