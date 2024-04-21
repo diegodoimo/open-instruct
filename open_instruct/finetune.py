@@ -437,23 +437,13 @@ def main():
     # ****************************************************************************
     # # Preprocessing the datasets.
 
-    train_dataset = get_dataset_open_instruct_new(
-        accelerator=accelerator,
-        filepath=args.train_file,
-        tokenizer=tokenizer,
-        max_seq_length=2048,
-        num_processes=1,
-    )
-
-    # train_dataset, longest_seq = MMLU_Dataset(
-    #     tokenizer=tokenizer,
-    #     max_seq_len=args.max_seq_len,
-    #     num_few_shots=args.num_few_shots,
+    # train_dataset = get_dataset_open_instruct_new(
     #     accelerator=accelerator,
-    #     subject=None,
-    #     num_processes=args.preprocessing_num_workers,
-    #     num_samples=args.num_samples,
-    # ).construct_dataset()
+    #     filepath=args.train_file,
+    #     tokenizer=tokenizer,
+    #     max_seq_length=2048,
+    #     num_processes=1,
+    # )
 
     # val_dataset = get_mmlu_open_instruct(
     #     filepath=args.test_file,
@@ -475,6 +465,18 @@ def main():
     #     subjects=None,
     # )
 
+    train_dataset, longest_seq = MMLU_Dataset(
+        tokenizer=tokenizer,
+        max_seq_len=args.max_seq_len,
+        num_few_shots=0,
+        accelerator=accelerator,
+        subject=None,
+        num_processes=args.preprocessing_num_workers,
+        split="train",
+    ).construct_dataset()
+
+    print(train_dataset[0])
+
     val_dataset, longest_seq = MMLU_Dataset(
         tokenizer=tokenizer,
         max_seq_len=args.max_seq_len,
@@ -482,7 +484,7 @@ def main():
         accelerator=accelerator,
         subject=None,
         num_processes=args.preprocessing_num_workers,
-        split="val",
+        split="validation",
     ).construct_dataset()
 
     test_dataset, longest_seq = MMLU_Dataset(
@@ -494,6 +496,8 @@ def main():
         num_processes=args.preprocessing_num_workers,
         split="test",
     ).construct_dataset()
+
+    assert False
 
     # ******************************************************************************************
 

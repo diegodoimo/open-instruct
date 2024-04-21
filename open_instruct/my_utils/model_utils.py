@@ -7,6 +7,7 @@ from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
 )
+from transformers import LlamaConfig
 from peft import LoraConfig, TaskType, get_peft_model
 import warnings
 

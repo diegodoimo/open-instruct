@@ -74,6 +74,7 @@ def get_dataset_hf(
     return tokenized_dataset
 
 
+# same as plain
 # def get_dataset_baroni(
 #     filepath,
 #     data_name,
@@ -451,66 +452,7 @@ def get_mmlu_open_instruct(
     return lm_datasets
 
 
-# ******************************************************************************************
-
-
-def get_mmlu_qlora(mmlu_dir, tokenizer, protocol="fs"):
-    if protocol == "zs":
-        mmlu_dataset = load_dataset(
-            "json",
-            data_files={
-                "eval": f"{mmlu_dir}/zero_shot_mmlu_val.json",
-                "test": f"{mmlu_dir}/zero_shot_mmlu_test.json",
-            },
-        )
-        # mmlu_dataset = mmlu_dataset.remove_columns("subject")
-    # MMLU Five-shot (Eval/Test only)
-    elif protocol == "fs":
-        mmlu_dataset = load_dataset(
-            "json",
-            data_files={
-                "eval": f"{mmlu_dir}/five_shot_mmlu_val.json",
-                "test": f"{mmlu_dir}/five_shot_mmlu_test.json",
-            },
-        )
-        # mmlu_dataset = mmlu_dataset.remove_columns('subject')
-    dataset = mmlu_dataset["test"]
-
-    def tokenize_example(tokenizer, batch):
-        encoded_input = [
-            tokenizer.encode(f"{example}".strip(), bos=False, eos=False)
-            for example in batch["input"]
-        ]
-        encoded_input_and_output = [
-            tokenizer.encode(s + " " + t, bos=False, eos=False)
-            for s, t in zip(batch["input"], batch["output"])
-        ]
-
-        labels = copy.deepcopy(encoded_input_and_output)
-
-        for label, source in zip(labels, encoded_input):
-            label[: len(source)] = torch.tensor(
-                [IGNORE_INDEX for _ in range(len(source))], dtype=torch.int
-            )
-
-        return {
-            "input_ids": encoded_input_and_output,
-            "labels": labels,
-            "subject": batch["subject"],
-        }
-
-    dataset = dataset.map(
-        partial(tokenize_example, tokenizer),
-        remove_columns=list(dataset.features),
-        batched=True,
-        num_proc=6,
-        load_from_cache_file=False,
-    )
-
-    return dataset
-
-
-# **********************************************
+# ******************************************************************************************************
 
 
 def filter_out_long_sequences(tokenized_dataset, max_seq_len):
@@ -597,7 +539,7 @@ class MMLU_Dataset:
                     lambda dev_example: dev_example["subject"] == subject,
                 )
 
-        for i, question in enumerate(questions):
+        for i in range(len(questions)):
             prompt = f"The following are multiple choice questions (with answers) about{self.format_subject(subjects[i])}.\n\n"
             current_subject = subjects[i]
             for j in range(num_few_shots):
@@ -647,6 +589,72 @@ class MMLU_Dataset:
             "attention_mask": attention_mask,
         }
 
+    def construct_prompt_train(self, batch, tokenizer, dev_set, max_seq_len):
+        prompts = []
+        premises = []
+
+        questions = batch["question"]  # list of strings
+        subjects = batch["subject"]  # list of strings
+        choices = batch["choices"]  # list of list of strings
+        answer_indices = np.array(batch["answer"])  # array of integers
+
+        for i in range(len(questions)):
+            # prompt = f"The following are multiple choice questions (with answers) about{self.format_subject(subjects[i])}.\n\n"
+            prompt = f"The following is a multiple choice question (with answers) about{self.format_subject(subjects[i])}.\n\n"
+            question = self.construct_question(
+                questions[i],
+                choices[i],
+                answer_indices[i],
+                include_answer=False,
+            )
+            answer = f" {self.answers[answer_indices[i]]}"
+            prompt = question + answer
+            prompts.append(prompt)
+            premises.append(question)
+
+        # tokenization part
+        tokenized_examples = [
+            tokenizer(
+                prompt,
+                return_tensors="pt",
+                max_length=max_seq_len,
+                truncation=False,
+                add_special_tokens=True,
+            ).input_ids.flatten()
+            for prompt in prompts
+        ]
+
+        # tokenized questions
+        tokenized_questions = [
+            tokenizer(
+                question,
+                return_tensors="pt",
+                max_length=max_seq_len,
+                truncation=False,
+                add_special_tokens=True,
+            ).input_ids.flatten()
+            for question in premises
+        ]
+
+        # mask out question part
+        tokenized_labels = [example.clone() for example in tokenized_examples]
+        for i, label_i in enumerate(tokenized_labels):
+            label_i[: len(tokenized_questions[i])] = IGNORE_INDEX
+            tokenized_labels[i] = label_i
+
+        attention_mask = [
+            torch.ones_like(input_ids) for input_ids in tokenized_examples
+        ]
+
+        return {
+            "prompt": prompts,
+            "answers": [self.answers[index] for index in answer_indices],
+            "subjects": subjects,
+            "input_ids": tokenized_examples,
+            "labels": tokenized_labels,
+            "attention_mask": attention_mask,
+        }
+
     def construct_dataset(self):
         """
         Construct the request instances for the scenario
@@ -673,8 +681,12 @@ class MMLU_Dataset:
         elif self.num_few_shots > 5:
             few_shot_dataset = load_dataset("cais/mmlu", "all", split="dev+val")
 
+        prompt_func = self.construct_prompt
+        if self.split == "train":
+            prompt_func = self.construct_prompt_train
+
         encode_function = partial(
-            self.construct_prompt,
+            prompt_func,
             tokenizer=self.tokenizer,
             dev_set=few_shot_dataset,
             max_seq_len=self.max_seq_len,
@@ -712,3 +724,65 @@ class MMLU_Dataset:
         )
 
         return tokenized_dataset, longest_sequences
+
+
+# ******************************************************************************************
+
+
+# def get_mmlu_qlora(mmlu_dir, tokenizer, protocol="fs"):
+#     if protocol == "zs":
+#         mmlu_dataset = load_dataset(
+#             "json",
+#             data_files={
+#                 "eval": f"{mmlu_dir}/zero_shot_mmlu_val.json",
+#                 "test": f"{mmlu_dir}/zero_shot_mmlu_test.json",
+#             },
+#         )
+#         # mmlu_dataset = mmlu_dataset.remove_columns("subject")
+#     # MMLU Five-shot (Eval/Test only)
+#     elif protocol == "fs":
+#         mmlu_dataset = load_dataset(
+#             "json",
+#             data_files={
+#                 "eval": f"{mmlu_dir}/five_shot_mmlu_val.json",
+#                 "test": f"{mmlu_dir}/five_shot_mmlu_test.json",
+#             },
+#         )
+#         # mmlu_dataset = mmlu_dataset.remove_columns('subject')
+#     dataset = mmlu_dataset["test"]
+
+#     def tokenize_example(tokenizer, batch):
+#         encoded_input = [
+#             tokenizer.encode(f"{example}".strip(), bos=False, eos=False)
+#             for example in batch["input"]
+#         ]
+#         encoded_input_and_output = [
+#             tokenizer.encode(s + " " + t, bos=False, eos=False)
+#             for s, t in zip(batch["input"], batch["output"])
+#         ]
+
+#         labels = copy.deepcopy(encoded_input_and_output)
+
+#         for label, source in zip(labels, encoded_input):
+#             label[: len(source)] = torch.tensor(
+#                 [IGNORE_INDEX for _ in range(len(source))], dtype=torch.int
+#             )
+
+#         return {
+#             "input_ids": encoded_input_and_output,
+#             "labels": labels,
+#             "subject": batch["subject"],
+#         }
+
+#     dataset = dataset.map(
+#         partial(tokenize_example, tokenizer),
+#         remove_columns=list(dataset.features),
+#         batched=True,
+#         num_proc=6,
+#         load_from_cache_file=False,
+#     )
+
+#     return dataset
+
+
+# **********************************************
