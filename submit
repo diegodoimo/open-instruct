@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=32           
 #SBATCH --mem=80G                
 #SBATCH --job-name=test
-#SBATCH --gres=gpu:2 
+#SBATCH --gres=gpu:1 
 
 #source /etc/profile.d/modules.sh
 #module use /opt/nvidia/hpc_sdk/modulefiles/
@@ -25,15 +25,14 @@ GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 
 
 # Lora training
-# accelerate launch \
-#     --mixed_precision bf16 \
-#     --num_machines 1 \
-#     --num_processes $NUM_GPUS \
-#     --dynamo_backend 'no' \
-
-torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
-        	--nnodes=1  --nproc-per-node=1 \
-    open_instruct/finetune.py \
+#torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
+#        	--nnodes=1  --nproc-per-node=1 \
+accelerate launch \
+    --mixed_precision bf16 \
+    --num_machines 1 \
+    --num_processes $NUM_GPUS \
+    --dynamo_backend 'no' \
+   open_instruct/finetune.py \
     --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v1/models_hf/7B \
     --use_lora \
     --lora_rank 64 \
