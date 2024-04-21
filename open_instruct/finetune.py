@@ -430,8 +430,8 @@ def main():
     )
 
     max_seq_len = model.config.max_position_embeddings
-    if args.max_seq_len is not None:
-        max_seq_len = args.max_seq_len
+    if args.max_seq_length is not None:
+        max_seq_len = args.max_seq_length
     accelerator.print(max_seq_len)
 
     # ****************************************************************************
@@ -467,7 +467,7 @@ def main():
 
     train_dataset, longest_seq = MMLU_Dataset(
         tokenizer=tokenizer,
-        max_seq_len=args.max_seq_len,
+        max_seq_len=args.max_seq_length,
         num_few_shots=0,
         accelerator=accelerator,
         subject=None,
@@ -475,11 +475,9 @@ def main():
         split="train",
     ).construct_dataset()
 
-    print(train_dataset[0])
-
     val_dataset, longest_seq = MMLU_Dataset(
         tokenizer=tokenizer,
-        max_seq_len=args.max_seq_len,
+        max_seq_len=args.max_seq_length,
         num_few_shots=0,
         accelerator=accelerator,
         subject=None,
@@ -489,15 +487,13 @@ def main():
 
     test_dataset, longest_seq = MMLU_Dataset(
         tokenizer=tokenizer,
-        max_seq_len=args.max_seq_len,
+        max_seq_len=args.max_seq_length,
         num_few_shots=0,
         accelerator=accelerator,
         subject=None,
         num_processes=args.preprocessing_num_workers,
         split="test",
     ).construct_dataset()
-
-    assert False
 
     # ******************************************************************************************
 

@@ -8,21 +8,11 @@
 #SBATCH --mem=80G                
 #SBATCH --job-name=test
 #SBATCH --gres=gpu:1 
-<<<<<<< HEAD
-
-#source /etc/profile.d/modules.sh
-#module use /opt/nvidia/hpc_sdk/modulefiles/
-#module load nvhpc
-
-
-source /u/area/ddoimo/anaconda3/bin/activate ./env_amd
-=======
 
 #source /etc/profile.d/modules.sh
 #module use /opt/nvidia/hpc_sdk/modulefiles/
 #module load nvhpc
 source /u/area/ddoimo/anaconda3/bin/activate ./env_amd_new
->>>>>>> 736319267eee0ef2bf763a69d83c4fffec1670b8
 
 export OMP_NUM_THREADS=32
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True" 

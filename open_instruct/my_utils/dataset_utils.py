@@ -589,7 +589,10 @@ class MMLU_Dataset:
             "attention_mask": attention_mask,
         }
 
-    def construct_prompt_train(self, batch, tokenizer, dev_set, max_seq_len):
+    def construct_prompt_train(
+        self, batch, tokenizer, dev_set, max_seq_len, num_few_shots=None
+    ):
+        # dev_set and few_shots are not used here
         prompts = []
         premises = []
 
@@ -642,6 +645,10 @@ class MMLU_Dataset:
             label_i[: len(tokenized_questions[i])] = IGNORE_INDEX
             tokenized_labels[i] = label_i
 
+        # double check
+        for label in tokenized_labels:
+            assert label[-1] != IGNORE_INDEX
+
         attention_mask = [
             torch.ones_like(input_ids) for input_ids in tokenized_examples
         ]
@@ -665,7 +672,7 @@ class MMLU_Dataset:
         split = self.split
         if self.split == "train":
             # training on the dev + val datasets
-            split = "dev+val"
+            split = "dev+validation"
             assert self.num_few_shots == 0
 
         if self.num_samples is not None:
@@ -679,7 +686,7 @@ class MMLU_Dataset:
         if self.num_few_shots > 0 and self.num_few_shots <= 5:
             few_shot_dataset = load_dataset("cais/mmlu", "all", split="dev")
         elif self.num_few_shots > 5:
-            few_shot_dataset = load_dataset("cais/mmlu", "all", split="dev+val")
+            few_shot_dataset = load_dataset("cais/mmlu", "all", split="dev+validation")
 
         prompt_func = self.construct_prompt
         if self.split == "train":
