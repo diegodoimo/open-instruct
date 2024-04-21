@@ -892,13 +892,6 @@ def main():
 
     # Prepare everything with `accelerator`.
     model = accelerator.prepare(model)
-    print(model)
-    for name, param in model.named_parameters():
-        print(name, param.dtype)
-    print_memory_consumed()
-    
-    assert False
-
     optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         optimizer, train_loader, lr_scheduler
     )

@@ -55,7 +55,7 @@ accelerate launch \
     --lr_scheduler_type linear \
     --warmup_ratio 0.03 \
     --weight_decay 0. \
-    --num_train_epochs 3 \
+    --num_train_epochs 2 \
     --output_dir ./results/${MODEL_SIZE}_lora/ \
     --with_tracking \
     --report_to tensorboard \
