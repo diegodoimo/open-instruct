@@ -19,7 +19,7 @@ export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 
 MODEL_SIZE=7B
 NUM_GPUS=1
-TOTAL_BATCH_SIZE=128
+TOTAL_BATCH_SIZE=16
 BATCH_SIZE_PER_GPU=1
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 
@@ -33,12 +33,12 @@ accelerate launch \
     --num_processes $NUM_GPUS \
     --dynamo_backend 'no' \
    open_instruct/finetune.py \
-    --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v1/models_hf/7B \
+    --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v2/models_hf/llama-2-7b \
     --use_lora \
     --lora_rank 64 \
     --lora_alpha 16 \
     --lora_dropout 0.1 \
-    --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v1/models_hf/7B \
+    --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v2/models_hf/llama-2-7b \
     --use_slow_tokenizer \
     --train_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/processed/dolly/dolly_data.jsonl \
     --val_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/eval/mmlu \
@@ -60,5 +60,5 @@ accelerate launch \
     --with_tracking \
     --report_to tensorboard \
     --logging_steps 20 \
-    --eval_steps 50
+    --eval_steps 40
     #--eval_steps 50 &&

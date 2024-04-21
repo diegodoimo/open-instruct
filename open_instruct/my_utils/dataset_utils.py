@@ -642,9 +642,9 @@ class MMLU_Dataset:
         # mask out question part
         tokenized_labels = [example.clone() for example in tokenized_examples]
 
-        # for i, label_i in enumerate(tokenized_labels):
-        #     label_i[: len(tokenized_questions[i])] = IGNORE_INDEX
-        #     tokenized_labels[i] = label_i
+        for i, label_i in enumerate(tokenized_labels):
+             label_i[: len(tokenized_questions[i])] = IGNORE_INDEX
+             tokenized_labels[i] = label_i
 
         # double check
         for label in tokenized_labels:
