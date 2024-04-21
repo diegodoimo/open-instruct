@@ -562,6 +562,7 @@ def main():
     )
 
     args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
@@ -681,7 +682,7 @@ def main():
             )
         else:
             active_dataloader = train_dataloader
-        print("tot iter:", len(active_dataloader))
+        print("tot iter:", args.max_train_steps)
         start = time.time()
         for step, batch in enumerate(active_dataloader):
             with accelerator.accumulate(model):
