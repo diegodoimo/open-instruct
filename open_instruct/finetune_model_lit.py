@@ -34,7 +34,8 @@ from transformers import (
 )
 from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
 
-from data_utils import get_mmlu_open_instruct, DataCollatorForCausalLM
+from my_utils.dataset_utils import get_mmlu_open_instruct
+from my_utils.dataloader_utils import DataCollatorForCausalLM
 import numpy as np
 import sys
 import time
@@ -502,11 +503,11 @@ def main():
         )
 
     # Load pretrained model and tokenizer
-    #if args.config_name:
+    # if args.config_name:
     #    config = AutoConfig.from_pretrained(args.config_name)
-    #elif args.model_name_or_path:
+    # elif args.model_name_or_path:
     #    config = AutoConfig.from_pretrained(args.model_name_or_path)
-    #else:
+    # else:
     #    warnings.warn("Using a fake llama for debugging\n", stacklevel=2)
     #    config = LlamaConfig()
     #    config.intermediate_size = 1000
@@ -514,9 +515,9 @@ def main():
     #    config.num_attention_heads = 2
     #    config.num_key_value_heads = 2
     #    config.hidden_size = 500
-        # raise ValueError(
-        #     "You are instantiating a new config instance from scratch. This is not supported by this script."
-        # )
+    # raise ValueError(
+    #     "You are instantiating a new config instance from scratch. This is not supported by this script."
+    # )
 
     if args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(
@@ -629,7 +630,7 @@ def main():
     )
 
     model = GPT(config)
-    model = model.to(dtype = torch.bfloat16)
+    model = model.to(dtype=torch.bfloat16)
     mark_only_lora_as_trainable(model)
 
     print(
@@ -967,10 +968,10 @@ def main():
     crit = torch.nn.CrossEntropyLoss()
     for epoch in range(starting_epoch, args.num_train_epochs):
         acc = evaluate(
-           model=model,
+            model=model,
             dataloader=test_loader,
             tokenizer=tokenizer,
-           restrict_targets=True,
+            restrict_targets=True,
         )
         print(f"baseline average mmlu test accuracy: {acc:.4f}")
         print_memory_consumed()

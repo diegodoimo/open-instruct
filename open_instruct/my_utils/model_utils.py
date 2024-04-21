@@ -2,89 +2,85 @@
 
 import sys
 from pathlib import Path
-import os
+import torch
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+)
+from peft import LoraConfig, TaskType, get_peft_model
+import warnings
 
 # support running without installing as a package
 wd = Path(__file__).parent.parent.resolve()
 sys.path.append(str(wd))
 
 
-from lit_gpt.lora import GPT, Config, mark_only_lora_as_trainable
-
-# from lit_gpt.tokenizer import Tokenizer
-from lit_gpt.utils import (
-    load_checkpoint,
-    num_parameters,
-)
-
-WORLD_SIZE = int(os.environ["WORLD_SIZE"])
-
-
-def get_model(train_config, fabric):
-
-    if not any(
-        (
-            train_config.lora_query,
-            train_config.lora_key,
-            train_config.lora_value,
-            train_config.lora_projection,
-            train_config.lora_mlp,
-            train_config.lora_head,
-        )
-    ):
-        print("Warning: all LoRA layers are disabled!")
-
-    mine_to_lit = {
-        "laptop_llama": "laptop_llama",
-        "llama-1-7b": "Llama-1-7b-hf",
-        "llama-1-13b": "Llama-1-13b-hf",
-        "llama-1-30b": "Llama-1-30b-hf",
-        "llama-1-65b": "Llama-1-65b-hf",
-        "llama-2-7b": "Llama-2-7b-hf",
-        "llama-2-13b": "Llama-2-13b-hf",
-        "llama-2-70b": "Llama-2-70b-hf",
-        "llama-2-7b-chat": "Llama-2-7b-chat-hf",
-        "llama-2-13b-chat": "Llama-2-13b-chat-hf",
-        "llama-2-70b-chat": "Llama-2-70b-chat-hf",
-    }
-
-    if train_config.model_name is not None:
-        model_name = train_config.model_name
+def get_model_hf(
+    accelerator,
+    model_name_or_path,
+    config_name,
+    low_cpu_mem_usage,
+    torch_dtype=torch.bfloat16,
+    use_lora=False,
+    lora_rank=64,
+    lora_alpha=16,
+    lora_dropout=0,
+    use_flash_attention=False,
+):
+    # Load pretrained model and tokenizer
+    if config_name:
+        config = AutoConfig.from_pretrained(config_name)
+    elif model_name_or_path:
+        config = AutoConfig.from_pretrained(model_name_or_path)
     else:
-        model_name = mine_to_lit[train_config.checkpoint_dir.name]
+        warnings.warn("Using a fake llama for debugging\n", stacklevel=2)
+        config = LlamaConfig()
+        config.intermediate_size = 1000
+        config.num_hidden_layers = 3
+        config.num_attention_heads = 2
+        config.num_key_value_heads = 2
+        config.hidden_size = 500
+        # raise ValueError(
+        #     "You are instantiating a new config instance from scratch. This is not supported by this script."
+        # )
 
-    print("model_name", model_name)
+    if model_name_or_path:
+        # here option for qlora in case
+        accelerator.print("model_loading started. \n\n")
+        sys.stdout.flush()
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name_or_path,
+            from_tf=bool(".ckpt" in model_name_or_path),
+            config=config,
+            low_cpu_mem_usage=low_cpu_mem_usage,
+            torch_dtype=torch_dtype,
+            use_flash_attention_2=True if use_flash_attention else False,
+        )
+        accelerator.print("model loading finished. \n\n")
+        sys.stdout.flush()
+    else:
+        accelerator.print("Training new model from scratch")
+        model = AutoModelForCausalLM.from_config(config)
 
-    config = Config.from_name(
-        name=model_name,
-        r=train_config.lora_r,
-        alpha=train_config.lora_alpha,
-        dropout=train_config.lora_dropout,
-        to_query=train_config.lora_query,
-        to_key=train_config.lora_key,
-        to_value=train_config.lora_value,
-        to_projection=train_config.lora_projection,
-        to_mlp=train_config.lora_mlp,
-        to_head=train_config.lora_head,
-    )
+    if use_lora:
 
-    with fabric.init_module(empty_init=(WORLD_SIZE > 1)):
-        model = GPT(config)
-
-    mark_only_lora_as_trainable(model)
-    fabric.print(
-        f"Number of trainable parameters: {num_parameters(model, requires_grad=True):,}"
-    )
-    fabric.print(
-        f"Number of non trainable parameters: {num_parameters(model, requires_grad=False):,}"
-    )
-
-    model = fabric.setup_module(model)
-
-    if train_config.checkpoint_dir is not None and model_name != "laptop_llama":
-        checkpoint_path = train_config.checkpoint_dir / "lit_model.pth"
-        fabric.print(f"Loading model {str(checkpoint_path)!r} with {config.__dict__}")
-        # strict=False because missing keys due to LoRA weights not contained in state dict
-        load_checkpoint(fabric, model, checkpoint_path, strict=False)
-
-    return model, model_name
+        accelerator.print("Initializing LORA model...")
+        peft_config = LoraConfig(
+            task_type=TaskType.CAUSAL_LM,
+            inference_mode=False,
+            r=lora_rank,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            target_modules=[
+                "q_proj",
+                "o_proj",
+                "v_proj",
+                "k_proj",
+                "gate_proj",
+                "up_proj",
+                "down_proj",
+            ],
+        )
+        model = get_peft_model(model, peft_config)
+        model.print_trainable_parameters()
+    return model
