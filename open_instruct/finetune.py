@@ -5,53 +5,40 @@ import argparse
 import logging
 import math
 import os
-import random
 import datasets
 import torch
-from functools import partial
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import set_seed
-from datasets import load_dataset
-from torch.utils.data import DataLoader
-from tqdm.auto import tqdm
 
 import transformers
 from transformers import (
-    AutoConfig,
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    LlamaTokenizer,
-    LlamaTokenizerFast,
     SchedulerType,
-    DataCollatorForSeq2Seq,
     get_scheduler,
-    GPTNeoXTokenizerFast,
-    GPT2Tokenizer,
-    OPTForCausalLM,
-    BitsAndBytesConfig,
 )
-from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
 
-from data_utils import get_mmlu_open_instruct_old, DataCollatorForCausalLM
+
 import numpy as np
 import sys
 import time
 
 
 # *******************************************************************************
+
 from my_utils.dataloader_utils import get_dataloader
-from my_utils.helpers import print_memory_consumed
+from my_utils.helpers import print_memory_consumed, save_with_accelerate
 from my_utils.dataset_utils import (
-    get_dataset_hf,
     get_dataset_open_instruct_new,
-    get_mmlu_open_instruct,
+    get_mmlu_open_instruct,  # old version
+    MMLU_Dataset,
 )
 from my_utils.dataloader_utils import get_dataloader
 from my_utils.optimizer_utils import get_optimizer, get_scheduler
 from my_utils.tokenizer_utils import get_tokenizer
 from my_utils.model_utils import get_model_hf
 
+
+# with fully sharded daat parallel if we can make this working
 from accelerate import FullyShardedDataParallelPlugin
 from torch.distributed.fsdp import (
     FullyShardedDataParallel as FSDP,
@@ -336,137 +323,6 @@ def parse_args():
     return args
 
 
-# def encode_with_prompt_completion_format(example, tokenizer, max_seq_length):
-#     """
-#     Here we assume each example has 'prompt' and 'completion' fields.
-#     We concatenate prompt and completion and tokenize them together because otherwise prompt will be padded/trancated
-#     and it doesn't make sense to follow directly with the completion.
-#     """
-#     # if prompt doesn't end with space and completion doesn't start with space, add space
-#     if not example["prompt"].endswith((" ", "\n", "\t")) and not example[
-#         "completion"
-#     ].startswith((" ", "\n", "\t")):
-#         example_text = example["prompt"] + " " + example["completion"]
-#     else:
-#         example_text = example["prompt"] + example["completion"]
-#     example_text = example_text + tokenizer.eos_token
-#     tokenized_example = tokenizer(
-#         example_text, return_tensors="pt", max_length=max_seq_length, truncation=True
-#     )
-#     input_ids = tokenized_example.input_ids
-#     labels = input_ids.clone()
-#     tokenized_prompt = tokenizer(
-#         example["prompt"],
-#         return_tensors="pt",
-#         max_length=max_seq_length,
-#         truncation=True,
-#     )
-#     # mask the prompt part for avoiding loss
-#     labels[:, : tokenized_prompt.input_ids.shape[1]] = -100
-#     attention_mask = torch.ones_like(input_ids)
-#     return {
-#         "input_ids": input_ids.flatten(),
-#         "labels": labels.flatten(),
-#         "attention_mask": attention_mask.flatten(),
-#     }
-
-
-# def encode_with_messages_format(example, tokenizer, max_seq_length):
-#     """
-#     Here we assume each example has a 'messages' field Each message is a dict with 'role' and 'content' fields.
-#     We concatenate all messages with the roles as delimiters and tokenize them together.
-#     """
-#     messages = example["messages"]
-#     if len(messages) == 0:
-#         raise ValueError("messages field is empty.")
-
-#     def _concat_messages(messages):
-#         message_text = ""
-#         for message in messages:
-#             if message["role"] == "system":
-#                 message_text += "<|system|>\n" + message["content"].strip() + "\n"
-#             elif message["role"] == "user":
-#                 message_text += "<|user|>\n" + message["content"].strip() + "\n"
-#             elif message["role"] == "assistant":
-#                 message_text += (
-#                     "<|assistant|>\n"
-#                     + message["content"].strip()
-#                     + tokenizer.eos_token
-#                     + "\n"
-#                 )
-#             else:
-#                 raise ValueError("Invalid role: {}".format(message["role"]))
-#         return message_text
-
-#     example_text = _concat_messages(messages).strip()
-#     tokenized_example = tokenizer(
-#         example_text, return_tensors="pt", max_length=max_seq_length, truncation=True
-#     )
-#     input_ids = tokenized_example.input_ids
-#     labels = input_ids.clone()
-
-#     # mask the non-assistant part for avoiding loss
-#     for message_idx, message in enumerate(messages):
-#         if message["role"] != "assistant":
-#             if message_idx == 0:
-#                 message_start_idx = 0
-#             else:
-#                 message_start_idx = tokenizer(
-#                     _concat_messages(messages[:message_idx]),
-#                     return_tensors="pt",
-#                     max_length=max_seq_length,
-#                     truncation=True,
-#                 ).input_ids.shape[1]
-#             if (
-#                 message_idx < len(messages) - 1
-#                 and messages[message_idx + 1]["role"] == "assistant"
-#             ):
-#                 # here we also ignore the role of the assistant
-#                 messages_so_far = (
-#                     _concat_messages(messages[: message_idx + 1]) + "<|assistant|>\n"
-#                 )
-#             else:
-#                 messages_so_far = _concat_messages(messages[: message_idx + 1])
-#             message_end_idx = tokenizer(
-#                 messages_so_far,
-#                 return_tensors="pt",
-#                 max_length=max_seq_length,
-#                 truncation=True,
-#             ).input_ids.shape[1]
-#             labels[:, message_start_idx:message_end_idx] = -100
-
-#             if message_end_idx >= max_seq_length:
-#                 break
-
-#     attention_mask = torch.ones_like(input_ids)
-#     return {
-#         "input_ids": input_ids.flatten(),
-#         "labels": labels.flatten(),
-#         "attention_mask": attention_mask.flatten(),
-#     }
-
-
-# def save_with_accelerate(accelerator, model, tokenizer, output_dir, args):
-#     unwrapped_model = accelerator.unwrap_model(model)
-#     # When doing multi-gpu training, we need to use accelerator.get_state_dict(model) to get the state_dict.
-#     # Otherwise, sometimes the model will be saved with only part of the parameters.
-#     # Also, accelerator needs to use the wrapped model to get the state_dict.
-#     state_dict = accelerator.get_state_dict(model)
-#     if args.use_lora:
-#         # When using lora, the unwrapped model is a PeftModel, which doesn't support the is_main_process
-#         # and has its own save_pretrained function for only saving lora modules.
-#         # We have to manually specify the is_main_process outside the save_pretrained function.
-#         if accelerator.is_main_process:
-#             unwrapped_model.save_pretrained(output_dir, state_dict=state_dict)
-#     else:
-#         unwrapped_model.save_pretrained(
-#             output_dir,
-#             is_main_process=accelerator.is_main_process,
-#             save_function=accelerator.save,
-#             state_dict=state_dict,
-#         )
-
-
 def main():
     args = parse_args()
 
@@ -554,7 +410,7 @@ def main():
     world_size = accelerator.num_processes
 
     # *******************************************************
-    # ********************************************************
+    # # Load pretrained model and tokenizer
 
     model = get_model_hf(
         accelerator=accelerator,
@@ -568,154 +424,18 @@ def main():
         lora_dropout=args.lora_dropout,
         use_flash_attention=False,
     )
-    # # Load pretrained model and tokenizer
-    # if args.config_name:
-    #     config = AutoConfig.from_pretrained(args.config_name)
-    # elif args.model_name_or_path:
-    #     config = AutoConfig.from_pretrained(args.model_name_or_path)
-    # else:
-    #     raise ValueError(
-    #         "You are instantiating a new config instance from scratch. This is not supported by this script."
-    #     )
-
-    # if args.model_name_or_path:
-    #     if args.use_qlora:
-    #         bnb_config = BitsAndBytesConfig(
-    #             load_in_4bit=True,
-    #             bnb_4bit_use_double_quant=True,
-    #             bnb_4bit_quant_type="nf4",
-    #             bnb_4bit_compute_dtype=torch.bfloat16,
-    #         )
-    #         device_index = accelerator.local_process_index
-    #         device_map = {"": device_index}  # force data-parallel training.
-    #         model = AutoModelForCausalLM.from_pretrained(
-    #             args.model_name_or_path,
-    #             from_tf=bool(".ckpt" in args.model_name_or_path),
-    #             config=config,
-    #             load_in_4bit=True,
-    #             quantization_config=bnb_config,
-    #             device_map=device_map,
-    #             torch_dtype=torch.bfloat16,
-    #             use_flash_attention_2=True if args.use_flash_attn else False,
-    #         )
-    #     else:
-    #         print("model_loading started. \n\n")
-    #         print(config)
-    #         sys.stdout.flush()
-    #         model = AutoModelForCausalLM.from_pretrained(
-    #             args.model_name_or_path,
-    #             from_tf=bool(".ckpt" in args.model_name_or_path),
-    #             config=config,
-    #             low_cpu_mem_usage=args.low_cpu_mem_usage,
-    #             torch_dtype=torch.bfloat16,
-    #             use_flash_attention_2=True if args.use_flash_attn else False,
-    #         )
-    #         print("model loading finished. \n\n")
-    #         sys.stdout.flush()
-    # else:
-    #     logger.info("Training new model from scratch")
-    #     model = AutoModelForCausalLM.from_config(config)
-
-    # if args.use_lora:
-    #     if args.use_qlora:
-    #         model = prepare_model_for_kbit_training(
-    #             model, use_gradient_checkpointing=args.gradient_checkpointing
-    #         )
-
-    #     logger.info("Initializing LORA model...")
-    #     peft_config = LoraConfig(
-    #         task_type=TaskType.CAUSAL_LM,
-    #         inference_mode=False,
-    #         r=args.lora_rank,
-    #         lora_alpha=args.lora_alpha,
-    #         lora_dropout=args.lora_dropout,
-    #         target_modules=[
-    #             "q_proj",
-    #             "o_proj",
-    #             "v_proj",
-    #             "k_proj",
-    #             "gate_proj",
-    #             "up_proj",
-    #             "down_proj",
-    #         ],
-    #     )
-    #     model = get_peft_model(model, peft_config)
-    #     model.print_trainable_parameters()
-
-    # ***************************************************************
-
-    print("model loaded. \n\n")
-    sys.stdout.flush()
 
     tokenizer = get_tokenizer(
         tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
     )
 
+    max_seq_len = model.config.max_position_embeddings
+    if args.max_seq_len is not None:
+        max_seq_len = args.max_seq_len
+    accelerator.print(max_seq_len)
+
     # ****************************************************************************
-
     # # Preprocessing the datasets.
-
-    # if args.dataset_name is not None:
-    #     # Downloading and loading a dataset from the hub.
-    #     raw_datasets = load_dataset(
-    #         args.dataset_name,
-    #         args.dataset_config_name,
-    #     )
-    # else:
-    #     data_files = {}
-    #     dataset_args = {}
-    #     if args.train_file is not None:
-    #         data_files["train"] = args.train_file
-    #     raw_datasets = load_dataset(
-    #         "json",
-    #         data_files=data_files,
-    #         **dataset_args,
-    #     )
-
-    # print("start preprocessing the data. \n\n")
-    # sys.stdout.flush()
-    # if (
-    #     "prompt" in raw_datasets["train"].column_names
-    #     and "completion" in raw_datasets["train"].column_names
-    # ):
-    #     encode_function = partial(
-    #         encode_with_prompt_completion_format,
-    #         tokenizer=tokenizer,
-    #         max_seq_length=args.max_seq_length,
-    #     )
-    # elif "messages" in raw_datasets["train"].column_names:
-    #     encode_function = partial(
-    #         encode_with_messages_format,
-    #         tokenizer=tokenizer,
-    #         max_seq_length=args.max_seq_length,
-    #     )
-    # else:
-    #     raise ValueError(
-    #         "You need to have either 'prompt'&'completion' or 'messages' in your column names."
-    #     )
-
-    # with accelerator.main_process_first():
-    #     lm_datasets = raw_datasets.map(
-    #         encode_function,
-    #         batched=False,
-    #         num_proc=args.preprocessing_num_workers,
-    #         load_from_cache_file=not args.overwrite_cache,
-    #         remove_columns=[
-    #             name
-    #             for name in raw_datasets["train"].column_names
-    #             if name not in ["input_ids", "labels", "attention_mask"]
-    #         ],
-    #         desc="Tokenizing and reformatting instruction data",
-    #     )
-
-    #     lm_datasets.set_format(type="pt")
-    #     lm_datasets = lm_datasets.filter(
-    #         lambda example: (example["labels"] != -100).any()
-    #     )
-
-    # train_dataset = lm_datasets["train"]
-    # print("finished preprocessing. \n\n")
-    # sys.stdout.flush()
 
     train_dataset = get_dataset_open_instruct_new(
         accelerator=accelerator,
@@ -725,55 +445,59 @@ def main():
         num_processes=1,
     )
 
-    val_dataset = get_mmlu_open_instruct_old(
-        filepath=args.test_file,
-        tokenizer=tokenizer,
-        data_fold="val",
-        max_seq_length=args.max_seq_length,
-        num_processes=6,
-        num_samples=None,
-        subjects=None,
-    )
+    # train_dataset, longest_seq = MMLU_Dataset(
+    #     tokenizer=tokenizer,
+    #     max_seq_len=args.max_seq_len,
+    #     num_few_shots=args.num_few_shots,
+    #     accelerator=accelerator,
+    #     subject=None,
+    #     num_processes=args.preprocessing_num_workers,
+    #     num_samples=args.num_samples,
+    # ).construct_dataset()
 
-    test_dataset = get_mmlu_open_instruct_old(
-        filepath=args.test_file,
+    # val_dataset = get_mmlu_open_instruct(
+    #     filepath=args.test_file,
+    #     tokenizer=tokenizer,
+    #     data_fold="val",
+    #     max_seq_length=args.max_seq_length,
+    #     num_processes=6,
+    #     num_samples=None,
+    #     subjects=None,
+    # )
+
+    # test_dataset = get_mmlu_open_instruct(
+    #     filepath=args.test_file,
+    #     tokenizer=tokenizer,
+    #     data_fold="test",
+    #     max_seq_length=args.max_seq_length,
+    #     num_processes=6,
+    #     num_samples=None,
+    #     subjects=None,
+    # )
+
+    val_dataset, longest_seq = MMLU_Dataset(
         tokenizer=tokenizer,
-        data_fold="test",
-        max_seq_length=args.max_seq_length,
-        num_processes=6,
-        num_samples=None,
-        subjects=None,
-    )
+        max_seq_len=args.max_seq_len,
+        num_few_shots=0,
+        accelerator=accelerator,
+        subject=None,
+        num_processes=args.preprocessing_num_workers,
+        split="val",
+    ).construct_dataset()
+
+    test_dataset, longest_seq = MMLU_Dataset(
+        tokenizer=tokenizer,
+        max_seq_len=args.max_seq_len,
+        num_few_shots=0,
+        accelerator=accelerator,
+        subject=None,
+        num_processes=args.preprocessing_num_workers,
+        split="test",
+    ).construct_dataset()
 
     # ******************************************************************************************
 
     # # DataLoaders creation:
-    # train_dataloader = DataLoader(
-    #     train_dataset,
-    #     shuffle=False,
-    #     # collate_fn=DataCollatorForSeq2Seq(
-    #     #     tokenizer=tokenizer, model=model, padding="longest"
-    #     # ),
-    #     collate_fn=DataCollatorForCausalLM(
-    #         tokenizer=tokenizer, max_seq_len=args.max_seq_length
-    #     ),
-    #     batch_size=args.per_device_train_batch_size,
-    # )
-    # print(len(train_dataloader))
-    # val_loader = DataLoader(
-    #     val_dataset,
-    #     shuffle=False,
-    #     collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
-    #     batch_size=args.per_device_eval_batch_size,
-    # )
-
-    # test_loader = DataLoader(
-    #     test_dataset,
-    #     shuffle=False,
-    #     collate_fn=DataCollatorForCausalLM(tokenizer=tokenizer, max_seq_len=4096),
-    #     batch_size=args.per_device_eval_batch_size,
-    # )
-
     train_loader, train_sampler = get_dataloader(
         train_dataset,
         args.per_device_train_batch_size,
@@ -805,69 +529,6 @@ def main():
 
     # *******************************************************************************
 
-    # # Optimizer
-    # # Split weights in two groups, one with weight decay and the other not.
-    # no_decay = ["bias", "layer_norm.weight"]
-    # optimizer_grouped_parameters = [
-    #     {
-    #         "params": [
-    #             p
-    #             for n, p in model.named_parameters()
-    #             if not any(nd in n for nd in no_decay)
-    #         ],
-    #         "weight_decay": args.weight_decay,
-    #     },
-    #     {
-    #         "params": [
-    #             p
-    #             for n, p in model.named_parameters()
-    #             if any(nd in n for nd in no_decay)
-    #         ],
-    #         "weight_decay": 0.0,
-    #     },
-    # ]
-    # if args.use_qlora:
-    #     from bitsandbytes.optim import AdamW
-
-    #     optimizer = AdamW(
-    #         optimizer_grouped_parameters,
-    #         lr=args.learning_rate,
-    #         optim_bits=8 if args.use_8bit_optimizer else 32,
-    #         is_paged=True,
-    #     )
-    # else:
-    #     optimizer = torch.optim.AdamW(
-    #         optimizer_grouped_parameters, lr=args.learning_rate
-    #     )
-
-    # # Scheduler and math around the number of training steps.
-    # overrode_max_train_steps = False
-    # num_update_steps_per_epoch = math.ceil(
-    #     len(train_dataloader) / args.gradient_accumulation_steps
-    # )
-    # if args.max_train_steps is None:
-    #     args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
-    #     overrode_max_train_steps = True
-
-    # # Create the learning rate scheduler.
-    # # Note: the current accelerator.step() calls the .step() of the real scheduler for the `num_processes` times. This is because they assume
-    # # the user initialize the scheduler with the entire training set. In the case of data parallel training, each process only
-    # # sees a subset (1/num_processes) of the training set. So each time the process needs to update the lr multiple times so that the total
-    # # number of updates in the end matches the num_training_steps here.
-    # # Here we need to set the num_training_steps to either using the entire training set (when epochs is specified) or we need to multiply the
-    # # num_training_steps by num_processes so that the total number of updates matches the num_training_steps.
-    # num_training_steps_for_scheduler = (
-    #     args.max_train_steps
-    #     if overrode_max_train_steps
-    #     else args.max_train_steps * accelerator.num_processes
-    # )
-    # lr_scheduler = get_scheduler(
-    #     name=args.lr_scheduler_type,
-    #     optimizer=optimizer,
-    #     num_training_steps=num_training_steps_for_scheduler,
-    #     num_warmup_steps=int(num_training_steps_for_scheduler * args.warmup_ratio),
-    # )
-
     gradient_accumulation_iters = max(
         1, int(args.batch_size / args.per_device_train_batch_size / world_size)
     )
@@ -876,7 +537,7 @@ def main():
         learning_rate=args.learning_rate,
         weight_decay=args.weight_decay,
     )
-    # optimizer = fabric.setup_optimizers(optimizer)
+
     lr_scheduler = get_scheduler(
         args.lr_scheduler_type,
         optimizer,
@@ -888,22 +549,12 @@ def main():
     )
 
     # ************************************************************************
-    # ************************************************************************
 
     # Prepare everything with `accelerator`.
     model = accelerator.prepare(model)
     optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         optimizer, train_loader, lr_scheduler
     )
-
-    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    # num_update_steps_per_epoch = math.ceil(
-    #     len(train_dataloader) / args.gradient_accumulation_steps
-    # )
-    # if overrode_max_train_steps:
-    #     args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
-    # # Afterwards we recalculate our number of training epochs
-    # args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
@@ -1189,4 +840,3 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
 if __name__ == "__main__":
     main()
-

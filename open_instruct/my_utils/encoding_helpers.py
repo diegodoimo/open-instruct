@@ -1,5 +1,6 @@
 import torch
 
+
 IGNORE_INDEX = -100
 
 
@@ -23,37 +24,37 @@ def encode_plain(example, tokenizer, max_seq_length, text_field):
     }
 
 
-def encode_with_prompt_completion_format(example, tokenizer, max_seq_length):
-    """
-    Here we assume each example has 'prompt' and 'completion' fields.
-    We concatenate prompt and completion and tokenize them together because otherwise prompt will be padded/trancated
-    and it doesn't make sense to follow directly with the completion.
-    """
-    # if prompt doesn't end with space and completion doesn't start with space, add space
-    if not example["prompt"].endswith((" ", "\n", "\t")) and not example[
-        "completion"
-    ].startswith((" ", "\n", "\t")):
-        example_text = example["prompt"] + " " + example["completion"]
-    else:
-        example_text = example["prompt"] + example["completion"]
-    example_text = example_text + tokenizer.eos_token
-    tokenized_example = tokenizer(example_text, return_tensors="pt")
-    # , max_length=max_seq_length, truncation=True
-    # )
-    input_ids = tokenized_example.input_ids
-    labels = input_ids.clone()
-    tokenized_prompt = tokenizer(example["prompt"], return_tensors="pt")
-    # max_length=max_seq_length,
-    # truncation=True,
-    # )
-    # mask the prompt part for avoiding loss
-    labels[:, : tokenized_prompt.input_ids.shape[1]] = IGNORE_INDEX
-    attention_mask = torch.ones_like(input_ids)
-    return {
-        "input_ids": input_ids.flatten(),
-        "labels": labels.flatten(),
-        "attention_mask": attention_mask.flatten(),
-    }
+# def encode_with_prompt_completion_format(example, tokenizer, max_seq_length):
+#     """
+#     Here we assume each example has 'prompt' and 'completion' fields.
+#     We concatenate prompt and completion and tokenize them together because otherwise prompt will be padded/trancated
+#     and it doesn't make sense to follow directly with the completion.
+#     """
+#     # if prompt doesn't end with space and completion doesn't start with space, add space
+#     if not example["prompt"].endswith((" ", "\n", "\t")) and not example[
+#         "completion"
+#     ].startswith((" ", "\n", "\t")):
+#         example_text = example["prompt"] + " " + example["completion"]
+#     else:
+#         example_text = example["prompt"] + example["completion"]
+#     example_text = example_text + tokenizer.eos_token
+#     tokenized_example = tokenizer(example_text, return_tensors="pt")
+#     # , max_length=max_seq_length, truncation=True
+#     # )
+#     input_ids = tokenized_example.input_ids
+#     labels = input_ids.clone()
+#     tokenized_prompt = tokenizer(example["prompt"], return_tensors="pt")
+#     # max_length=max_seq_length,
+#     # truncation=True,
+#     # )
+#     # mask the prompt part for avoiding loss
+#     labels[:, : tokenized_prompt.input_ids.shape[1]] = IGNORE_INDEX
+#     attention_mask = torch.ones_like(input_ids)
+#     return {
+#         "input_ids": input_ids.flatten(),
+#         "labels": labels.flatten(),
+#         "attention_mask": attention_mask.flatten(),
+#     }
 
 
 def encode_with_prompt_completion_format(example, tokenizer, max_seq_length):
@@ -255,8 +256,6 @@ def encode_with_messages_format(example, tokenizer, max_seq_length):
 
 # ****************************************************************
 # mmlu #
-
-
 def format_subject(subject):
     l = subject.split("_")
     s = ""
@@ -321,3 +320,40 @@ def encode_open_instruct_mmlu(
         "labels": labels.flatten(),
         "attention_mask": attention_mask.flatten(),
     }
+
+
+# def encode_open_instruct_mmlu(
+#     example, tokenizer, dev_df, max_seq_length, num_few_shots=0
+# ):
+#     """
+#     Here we assume each example has 'prompt' and 'completion' fields.
+#     We concatenate prompt and completion and tokenize them together because otherwise prompt will be padded/trancated
+#     and it doesn't make sense to follow directly with the completion.
+#     """
+#     subject = example["subject"]
+#     prompt_end = format_example(example, include_answer=False)
+#     train_prompt = gen_prompt(dev_df, subject, num_few_shots)
+#     prompt = train_prompt + prompt_end
+
+#     tokenized_example = tokenizer(
+#         prompt,
+#         return_tensors="pt",
+#         max_length=max_seq_length,
+#         truncation=False,
+#         add_special_tokens=True,
+#     )
+
+#     tokenized_labels = tokenizer(example["answers"], return_tensors="pt")
+
+#     input_ids = tokenized_example.input_ids
+#     labels = tokenized_labels.input_ids
+#     attention_mask = torch.ones_like(input_ids)
+
+#     return {
+#         "input_ids": input_ids.flatten(),
+#         "labels": labels.flatten(),
+#         "attention_mask": attention_mask.flatten(),
+#     }
+
+
+# *******************************************************************************************

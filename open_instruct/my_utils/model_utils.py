@@ -2,14 +2,13 @@
 
 import sys
 from pathlib import Path
-import os
 import torch
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
 )
 from peft import LoraConfig, TaskType, get_peft_model
-
+import warnings
 
 # support running without installing as a package
 wd = Path(__file__).parent.parent.resolve()
@@ -34,9 +33,16 @@ def get_model_hf(
     elif model_name_or_path:
         config = AutoConfig.from_pretrained(model_name_or_path)
     else:
-        raise ValueError(
-            "You are instantiating a new config instance from scratch. This is not supported by this script."
-        )
+        warnings.warn("Using a fake llama for debugging\n", stacklevel=2)
+        config = LlamaConfig()
+        config.intermediate_size = 1000
+        config.num_hidden_layers = 3
+        config.num_attention_heads = 2
+        config.num_key_value_heads = 2
+        config.hidden_size = 500
+        # raise ValueError(
+        #     "You are instantiating a new config instance from scratch. This is not supported by this script."
+        # )
 
     if model_name_or_path:
         # here option for qlora in case

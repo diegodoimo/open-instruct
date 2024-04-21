@@ -34,7 +34,7 @@ from transformers import (
 )
 from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
 
-from data_utils import get_mmlu_open_instruct, DataCollatorForCausalLM
+
 import numpy as np
 import sys
 import time
@@ -48,10 +48,12 @@ import warnings
 #     from my_utils.dataloader_utils import get_dataloader
 # except:
 #     sys.path.append("/home/diego/area_science/ricerca/finetuning_llm/final/lit_gpt")
+
+
 from my_utils.dataloader_utils import get_dataloader
 from my_utils.helpers import print_memory_consumed
 from my_utils.dataset_utils import get_dataset_hf, get_mmlu_open_instruct
-from my_utils.dataloader_utils import get_dataloader
+from my_utils.dataloader_utils import get_dataloader, DataCollatorForCausalLM
 from my_utils.optimizer_utils import get_optimizer, get_scheduler
 from my_utils.tokenizer_utils import get_tokenizer
 

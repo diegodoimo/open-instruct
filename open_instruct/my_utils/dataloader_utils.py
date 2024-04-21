@@ -77,3 +77,37 @@ class DataCollatorForCausalLM:
             labels=labels,
             attention_mask=attention_mask,
         )
+
+
+# old version
+# @dataclass
+# class DataCollatorForCausalLM:
+#     """Collate examples for supervised fine-tuning."""
+
+#     tokenizer: transformers.PreTrainedTokenizer
+#     max_seq_len: int
+
+#     # check if we can set padding value in labels == eos_token_id_directly (as the attention mask should take into account the gradient masking)
+
+#     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+#         # in the structure of open-instruct the instances are already tensors, and already take into account max_seq_len
+
+#         input_ids = [instance["input_ids"] for instance in instances]
+#         labels = [instance["labels"] for instance in instances]
+#         attention_mask = [instance["attention_mask"] for instance in instances]
+
+#         input_ids = torch.nn.utils.rnn.pad_sequence(
+#             input_ids, batch_first=True, padding_value=self.tokenizer.pad_token_id
+#         )
+#         labels = torch.nn.utils.rnn.pad_sequence(
+#             labels, batch_first=True, padding_value=IGNORE_INDEX
+#         )
+#         attention_mask = torch.nn.utils.rnn.pad_sequence(
+#             attention_mask, batch_first=True, padding_value=0
+#         )
+
+#         return dict(
+#             input_ids=input_ids,
+#             labels=labels,
+#             attention_mask=attention_mask,
+#         )

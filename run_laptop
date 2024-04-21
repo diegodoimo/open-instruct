@@ -12,7 +12,7 @@ accelerate launch -h
 accelerate launch \
     --num_machines 1 \
     --num_processes 1 \
-    open_instruct/finetune_refactored.py \
+    open_instruct/finetune.py \
     --use_lora \
     --lora_rank 64 \
     --lora_alpha 16 \
