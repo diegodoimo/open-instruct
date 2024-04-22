@@ -738,14 +738,14 @@ def main():
                     )
                     sys.stdout.flush()
 
-                # if isinstance(checkpointing_steps, int):
-                #    if completed_steps % checkpointing_steps == 0:
-                #        output_dir = f"step_{completed_steps}"
-                #        if args.output_dir is not None:
-                #            output_dir = os.path.join(args.output_dir, output_dir)
-                #        save_with_accelerate(
-                #            accelerator, model, tokenizer, output_dir, args
-                #        )
+                if isinstance(checkpointing_steps, int):
+                    if completed_steps % checkpointing_steps == 0:
+                        output_dir = f"step_{completed_steps}"
+                        if args.output_dir is not None:
+                            output_dir = os.path.join(args.output_dir, output_dir)
+                        save_with_accelerate(
+                            accelerator, model, tokenizer, output_dir, args
+                        )
 
                 if completed_steps >= args.max_train_steps:
                     break
@@ -760,20 +760,20 @@ def main():
         print_memory_consumed()
         print("before after evaluate")
 
-        # if args.checkpointing_steps == "epoch":
-        #    output_dir = f"epoch_{epoch}"
-        #    if args.output_dir is not None:
-        #        output_dir = os.path.join(args.output_dir, output_dir)
-        #    save_with_accelerate(accelerator, model, tokenizer, output_dir, args)
+        if args.checkpointing_steps == "epoch":
+            output_dir = f"epoch_{epoch}"
+            if args.output_dir is not None:
+                output_dir = os.path.join(args.output_dir, output_dir)
+            save_with_accelerate(accelerator, model, tokenizer, output_dir, args)
 
     if args.with_tracking:
         accelerator.end_training()
 
-    # if args.output_dir is not None:
-    #     accelerator.wait_for_everyone()
-    #     if accelerator.is_main_process:
-    #         tokenizer.save_pretrained(args.output_dir)
-    #     save_with_accelerate(accelerator, model, tokenizer, args.output_dir, args)
+    if args.output_dir is not None:
+        accelerator.wait_for_everyone()
+        if accelerator.is_main_process:
+            tokenizer.save_pretrained(args.output_dir)
+        save_with_accelerate(accelerator, model, tokenizer, args.output_dir, args)
 
 
 # FSDP has issues with `inference_mode`
