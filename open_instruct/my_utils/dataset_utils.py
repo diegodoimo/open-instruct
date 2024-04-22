@@ -673,7 +673,7 @@ class MMLU_Dataset:
         split = self.split
         if self.split == "train":
             # training on the dev + val datasets
-            split = "dev+validation"
+            split = "dev"
             assert self.num_few_shots == 0
 
         if self.num_samples is not None:

@@ -796,9 +796,9 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
     sys.stdout.flush()
 
     for iter_num, batch in enumerate(dataloader):
-        if (iter_num + 1) % int(1000 / dataloader.batch_size) == 0:
+        if (iter_num + 1) % int(2000 / dataloader.batch_size) == 0:
             print(
-                f"{iter_num * dataloader.batch_size}/ {len(dataloader.dataset)} inputs processed"
+                f"{iter_num * dataloader.batch_size+1}/ {len(dataloader.dataset)} inputs processed"
             )
             sys.stdout.flush()
 
