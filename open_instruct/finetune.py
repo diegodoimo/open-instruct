@@ -316,7 +316,16 @@ def parse_args():
         action="store_true",
         help="Use 8bit optimizer from bitsandbytes. Not compatible with deepspeed (use deepspeed config instead).",
     )
-
+    parser.add_argument(
+        "--measure_baselines",
+        action="store_true",
+        help="",
+    )
+    parser.add_argument(
+        "--measure_overlap",
+        action="store_true",
+        help="",
+    )
     parser.add_argument("--overlap_base_dir", type=str, default=None, help="")
 
     args = parser.parse_args()
@@ -673,7 +682,7 @@ def main():
             val_loader=val_loader,
             completed_steps=0,
             epoch=0,
-            do_overlap=True,
+            do_overlap=args.measure_overlap,
         )
 
     assert False
@@ -756,7 +765,7 @@ def main():
                         val_loader=val_loader,
                         completed_steps=completed_steps,
                         epoch=epoch,
-                        do_overlap=True,
+                        do_overlap=args.measure_overlap,
                     )
 
                 if isinstance(checkpointing_steps, int):
@@ -775,7 +784,7 @@ def main():
             test_loader=test_loader,
             completed_steps=completed_steps,
             epoch=epoch,
-            do_overlap=True,
+            do_overlap=args.measure_overlap,
         )
         print_memory_consumed()
 
