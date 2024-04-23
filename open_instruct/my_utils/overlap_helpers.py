@@ -16,12 +16,15 @@ def compute_overlap(
     dtypes,
     base_dir,
 ):
+    target_layer_names = list(target_layers.values())
+    target_layer_indices = list(target_layers.keys())
+
     model.eval()
     extr_act = extract_activations(
         accelerator,
         model,
         val_loader,
-        target_layers,
+        target_layer_names,
         embdims,
         dtypes,
         use_last_token=True,
@@ -33,15 +36,19 @@ def compute_overlap(
 
     ov_0shot = {}
     ov_5shot = {}
-    for name, act in act_dict.items():
+    for i, (name, act) in act_dict.items():
         d = Data(coordinates=act.to(torch.float32).numpy())
 
-        repr_0shot = torch.load(f"{base_dir}/0shot/l{name}_target.pt")
+        repr_0shot = torch.load(
+            f"{base_dir}/0shot/l{target_layer_indices[i]}_target.pt"
+        )
         ov_0shot[name] = d.compute_data_overlap(
             corrdinates=repr_0shot.to(torch.float32).numpy()
         )
 
-        repr_5shot = torch.load(f"{base_dir}/5shot/l{name}_target.pt")
+        repr_5shot = torch.load(
+            f"{base_dir}/5shot/l{target_layer_indices[i]}_target.pt"
+        )
         ov_5shot[name] = d.compute_data_overlap(
             corrdinates=repr_5shot.to(torch.float32).numpy()
         )
