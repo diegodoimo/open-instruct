@@ -59,7 +59,7 @@ from functools import partial
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 
 from collections import defaultdict
-from dadpy.data import Data
+from dadapy.data import Data
 import pickle
 
 # *******************************************************************
