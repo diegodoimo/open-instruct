@@ -59,12 +59,10 @@ def get_target_layers_llama(model, n_layer, option="norm1", every=1, world_size=
     suffix = map_names[option]
     names = [name for name, _ in model.named_modules()]
 
-    prefix = "module."
+    prefix = "base_model.model."
     middle = ""
 
-    try:
-        assert f"{prefix}model.layers.0{middle}{suffix}" in names
-    except:
+    if world_size > 1:
         prefix = "_fsdp_wrapped_module."
         if map_names[option] != "":
             middle = "._fsdp_wrapped_module"
@@ -95,6 +93,7 @@ def get_embdims(model, dataloader, target_layers):
 
         return hook_fn
 
+
     handles = {}
     for name, module in model.named_modules():
         if name in target_layers:
@@ -108,5 +107,5 @@ def get_embdims(model, dataloader, target_layers):
         if name in target_layers:
             handles[name].remove()
 
-    assert len(embdims) == len(target_layers)
+    assert len(embdims) == len(target_layers), (f"num embdims: {len(embdims)}", f"num target layers: {len(target_layers)}")
     return embdims, dtypes

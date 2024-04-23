@@ -33,12 +33,12 @@ accelerate launch \
     --num_processes $NUM_GPUS \
     --dynamo_backend 'no' \
    open_instruct/finetune.py \
-    --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v2/models_hf/llama-2-13b \
+    --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v2/models_hf/llama-2-7b \
     --use_lora \
     --lora_rank 64 \
     --lora_alpha 16 \
     --lora_dropout 0.1 \
-    --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v2/models_hf/llama-2-13b \
+    --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v2/models_hf/llama-2-7b \
     --use_slow_tokenizer \
     --train_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/processed/dolly/dolly_data.jsonl \
     --val_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/eval/mmlu \
