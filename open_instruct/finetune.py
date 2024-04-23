@@ -36,7 +36,12 @@ from my_utils.dataloader_utils import get_dataloader
 from my_utils.optimizer_utils import get_optimizer, get_scheduler
 from my_utils.tokenizer_utils import get_tokenizer
 from my_utils.model_utils import get_model_hf
-
+from my_utils.overlap_helpers import (
+    get_embdims,
+    get_target_layers_llama,
+    compute_overlap,
+)
+from my_utils.extract_repr import extract_activations
 
 # with fully sharded daat parallel if we can make this working
 from accelerate import FullyShardedDataParallelPlugin
@@ -53,6 +58,9 @@ from torch.distributed.fsdp.wrap import (
 from functools import partial
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 
+from collections import defaultdict
+from dadpy.data import Data
+import pickle
 
 # *******************************************************************
 
@@ -650,24 +658,34 @@ def main():
     print_memory_consumed()
     print("before train run")
 
-    # acc = evaluate(
-    #    model=model,
-    #    dataloader=test_loader,
-    #    tokenizer=tokenizer,
-    #    restrict_targets=True,
-    # )
-    # print(f"baseline average mmlu test accuracy: {acc:.4f}")
-    # print_memory_consumed()
-    # print("before after evaluate")
+    meter = measure_statistics(
+        model,
+        accelerator,
+        val_loader,
+        tokenizer,
+        base_dir="/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/mmlu/llama-2-7b",
+        compute_overlap=True,
+    )
+
+    if args.measure_baselines:
+        meter.update(
+            accelerator=accelerator,
+            model=model,
+            test_loader=test_loader,
+            completed_steps=0,
+            epoch=0,
+            do_overlap=True,
+        )
 
     for epoch in range(starting_epoch, args.num_train_epochs):
-        acc = evaluate(
+        meter.update(
+            accelerator=accelerator,
             model=model,
-            dataloader=val_loader,
-            tokenizer=tokenizer,
-            restrict_targets=True,
+            val_loader=val_loader,
+            completed_steps=0,
+            epoch=0,
+            do_overlap=False,
         )
-        print(f"baseline average mmlu val accuracy: {acc:.4f}")
 
         model.train()
         total_loss = 0
@@ -682,6 +700,7 @@ def main():
             )
         else:
             active_dataloader = train_dataloader
+
         start = time.time()
         for step, batch in enumerate(active_dataloader):
             with accelerator.accumulate(model):
@@ -709,7 +728,7 @@ def main():
                         / args.gradient_accumulation_steps
                         / args.logging_steps
                     )
-                    print(
+                    logger.info(
                         f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
                     )
                     sys.stdout.flush()
@@ -723,20 +742,17 @@ def main():
                             step=completed_steps,
                         )
                     total_loss = 0
+
                 if completed_steps % args.eval_steps == 0:
-                    t0 = time.time()
-                    acc = evaluate(
+
+                    meter.update(
+                        accelerator=accelerator,
                         model=model,
-                        dataloader=val_loader,
-                        tokenizer=tokenizer,
-                        restrict_targets=True,
+                        val_loader=val_loader,
+                        completed_steps=completed_steps,
+                        epoch=epoch,
+                        do_overlap=True,
                     )
-                    t1 = time.time() - t0
-                    t_tot -= t1
-                    print(
-                        f"baseline average mmlu val accuracy: {acc:.4f}, time {t1/60: .2f} min"
-                    )
-                    sys.stdout.flush()
 
                 if isinstance(checkpointing_steps, int):
                     if completed_steps % checkpointing_steps == 0:
@@ -748,15 +764,15 @@ def main():
                 if completed_steps >= args.max_train_steps:
                     break
 
-        acc = evaluate(
+        meter.update(
+            accelerator=accelerator,
             model=model,
-            dataloader=test_loader,
-            tokenizer=tokenizer,
-            restrict_targets=True,
+            test_loader=test_loader,
+            completed_steps=completed_steps,
+            epoch=epoch,
+            do_overlap=True,
         )
-        print(f"test accuracy after epoch {epoch+1}: {acc:.4f}")
         print_memory_consumed()
-        print("before after evaluate")
 
         if args.checkpointing_steps == "epoch":
             output_dir = f"epoch_{epoch}"
@@ -789,9 +805,6 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
             tokenizer.encode(" " + answer_choice, add_special_tokens=False)[-1]
             for answer_choice in choices
         ]
-
-    print("evaluating mmlu")
-    sys.stdout.flush()
 
     for iter_num, batch in enumerate(dataloader):
         if (iter_num + 1) % int(2000 / dataloader.batch_size) == 0:
@@ -834,6 +847,90 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
     model.train()
 
     return acc
+
+
+class measure_statistics:
+    def __init__(
+        self,
+        model,
+        val_loader,
+        tokenizer,
+        accelerator,
+        base_dir=None,
+    ):
+
+        self.stats = defaultdict(dict)
+        self.base_dir = base_dir
+        self.tokenizer = tokenizer
+
+        if compute_overlap:
+            self.target_layers = get_target_layers_llama(
+                model=model,
+                n_layer=model.config.num_hidden_layers,
+                option="norm1",
+                every=2,
+                world_size=accelerator.num_processes,
+            )
+            self.embdims, self.dtypes = get_embdims(
+                model, val_loader, self.target_layers
+            )
+
+    def update(
+        self,
+        accelerator,
+        model,
+        completed_steps,
+        epoch,
+        val_loader=None,
+        test_loader=None,
+        loss=None,
+        do_overlap=False,
+    ):
+
+        self.stats["epoch"][completed_steps] = epoch
+        self.stats["iter"][completed_steps] = completed_steps
+        if loss is not None:
+            self.stats["loss"][completed_steps] = loss
+
+        if val_loader is not None:
+            acc = evaluate(
+                model=model,
+                dataloader=val_loader,
+                tokenizer=self.tokenizer,
+                restrict_targets=True,
+            )
+            logger.info(f"iter {completed_steps}. mmlu val accuracy: {acc:.4f}")
+            self.stats["mmlu_val"][completed_steps] = acc
+
+        if test_loader is not None:
+            acc = evaluate(
+                model=model,
+                dataloader=test_loader,
+                tokenizer=self.tokenizer,
+                restrict_targets=True,
+            )
+            logger.info(f"mmlu test accuracy after epoch {epoch}: {acc:.4f}")
+            self.stats["mmlu_val"][completed_steps] = acc
+
+        if do_overlap:
+            ov_0shot, ov_5shot = compute_overlap(
+                accelerator,
+                model,
+                val_loader,
+                self.tokenizer,
+                self.target_layers,
+                self.embdims,
+                self.dtypes,
+                self.base_dir,
+            )
+            self.stats["ov_0shot"][completed_steps] = ov_0shot
+            self.stats["ov_5shot"][completed_steps] = ov_5shot
+            logger.info(f"iter {completed_steps}. overlap 0 shot: {ov_0shot:.4f}")
+            logger.info(f"iter {completed_steps}. overlap 5 shot: {ov_5shot:.4f}")
+            sys.stdout.flush()
+
+        with open(f"{self.output_dir}/train_statistics.pkl", "wb") as f:
+            pickle.dump(self.stats, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 if __name__ == "__main__":
