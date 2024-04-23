@@ -36,7 +36,7 @@ def compute_overlap(
 
     ov_0shot = {}
     ov_5shot = {}
-    for i, (name, act) in act_dict.items():
+    for i, (name, act) in enumerate(act_dict.items()):
         d = Data(coordinates=act.to(torch.float32).numpy())
 
         repr_0shot = torch.load(

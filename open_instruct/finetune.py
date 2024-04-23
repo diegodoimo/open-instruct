@@ -886,11 +886,10 @@ class measure_statistics:
                 world_size=accelerator.num_processes,
             )
 
-            self.target_layer_names = list(target_layers.values())
-            self.target_layer_indices = list(target_layers.keys())
+            self.target_layers = target_layers
 
             self.embdims, self.dtypes = get_embdims(
-                model, val_loader, self.target_layer_names
+                model, val_loader, list(target_layers.values())
             )
 
     def update(
