@@ -655,11 +655,7 @@ def main():
     # update the progress_bar if load from checkpoint
     # progress_bar.update(completed_steps)
 
-    print("start training")
-    sys.stdout.flush()
-
-    print_memory_consumed()
-    print("before train run")
+    print(model)
 
     meter = measure_statistics(
         model,
@@ -681,6 +677,11 @@ def main():
         )
 
     assert False
+
+    accelerate.print("start training")
+    print_memory_consumed()
+    accelerate.print("before train run")
+    sys.stdout.flush()
     for epoch in range(starting_epoch, args.num_train_epochs):
         meter.update(
             accelerator=accelerator,
