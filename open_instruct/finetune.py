@@ -887,7 +887,8 @@ class measure_statistics:
             )
 
             self.target_layer_names = list(target_layers.values())
-            # target_layer_labels = list(target_layers.keys())
+            self.target_layer_indices = list(target_layers.keys())
+
             self.embdims, self.dtypes = get_embdims(
                 model, val_loader, self.target_layer_names
             )
@@ -935,7 +936,7 @@ class measure_statistics:
                 model,
                 val_loader,
                 self.tokenizer,
-                self.target_layer_names,
+                self.target_layers,
                 self.embdims,
                 self.dtypes,
                 self.base_dir,
