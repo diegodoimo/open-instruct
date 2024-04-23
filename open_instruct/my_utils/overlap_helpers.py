@@ -61,8 +61,10 @@ def get_target_layers_llama(model, n_layer, option="norm1", every=1, world_size=
 
     prefix = "module."
     middle = ""
-    # accelerate does not cast to bf16 a DDP model yet
-    if world_size > 0:
+
+    try:
+        assert f"{prefix}model.layers.0{middle}{suffix}" in names
+    except:
         prefix = "_fsdp_wrapped_module."
         if map_names[option] != "":
             middle = "._fsdp_wrapped_module"
