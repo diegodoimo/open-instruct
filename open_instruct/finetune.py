@@ -871,15 +871,18 @@ class measure_statistics:
 
         if prepare_for_overlap:
             assert base_dir is not None
-            self.target_layers = get_target_layers_llama(
+            target_layers = get_target_layers_llama(
                 model=model,
                 n_layer=model.config.num_hidden_layers,
                 option="norm1",
                 every=2,
                 world_size=accelerator.num_processes,
             )
+
+            self.target_layer_names = list(target_layers.values())
+            # target_layer_labels = list(target_layers.keys())
             self.embdims, self.dtypes = get_embdims(
-                model, val_loader, self.target_layers
+                model, val_loader, self.target_layer_names
             )
 
     def update(
@@ -925,7 +928,7 @@ class measure_statistics:
                 model,
                 val_loader,
                 self.tokenizer,
-                self.target_layers,
+                self.target_layer_names,
                 self.embdims,
                 self.dtypes,
                 self.base_dir,
