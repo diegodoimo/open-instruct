@@ -49,7 +49,7 @@ accelerate launch \
     --checkpointing_steps epoch \
     --batch_size $TOTAL_BATCH_SIZE \
     --per_device_train_batch_size 1 \
-    --per_device_eval_batch_size 4 \
+    --per_device_eval_batch_size 1 \
     --gradient_accumulation_steps $GRADIENT_ACC_STEPS \
     --learning_rate 1e-4 \
     --lr_scheduler_type linear \
@@ -61,4 +61,5 @@ accelerate launch \
     --report_to tensorboard \
     --logging_steps 20 \
     --eval_steps 20 \
+    --measure_baselines --measure_overlap \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/llama-2-7b"
