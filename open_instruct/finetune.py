@@ -316,6 +316,9 @@ def parse_args():
         action="store_true",
         help="Use 8bit optimizer from bitsandbytes. Not compatible with deepspeed (use deepspeed config instead).",
     )
+
+    parser.add_argument("--overlap_base_dir", type=str, default=None, help="")
+
     args = parser.parse_args()
 
     # Sanity checks
@@ -660,23 +663,24 @@ def main():
 
     meter = measure_statistics(
         model,
-        accelerator,
         val_loader,
         tokenizer,
-        base_dir="/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/mmlu/llama-2-7b",
-        compute_overlap=True,
+        accelerator,
+        base_dir=args.overlap_base_dir,
+        prepare_for_overlap=True,
     )
 
     if args.measure_baselines:
         meter.update(
             accelerator=accelerator,
             model=model,
-            test_loader=test_loader,
+            val_loader=val_loader,
             completed_steps=0,
             epoch=0,
             do_overlap=True,
         )
 
+    assert False
     for epoch in range(starting_epoch, args.num_train_epochs):
         meter.update(
             accelerator=accelerator,
@@ -857,13 +861,15 @@ class measure_statistics:
         tokenizer,
         accelerator,
         base_dir=None,
+        prepare_for_overlap=False,
     ):
 
         self.stats = defaultdict(dict)
         self.base_dir = base_dir
         self.tokenizer = tokenizer
 
-        if compute_overlap:
+        if prepare_for_overlap:
+            assert base_dir is not None
             self.target_layers = get_target_layers_llama(
                 model=model,
                 n_layer=model.config.num_hidden_layers,

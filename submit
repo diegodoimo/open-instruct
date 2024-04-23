@@ -60,5 +60,6 @@ accelerate launch \
     --with_tracking \
     --report_to tensorboard \
     --logging_steps 20 \
-    --eval_steps 50
+    --eval_steps 50 \
+    --overlap_base_dir /u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/llama-2-7b
     #--eval_steps 50 &&
