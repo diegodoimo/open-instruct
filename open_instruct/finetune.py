@@ -682,7 +682,6 @@ def main():
             do_overlap=args.measure_overlap,
         )
 
-    assert False
 
     accelerate.print("start training")
     print_memory_consumed()
@@ -882,7 +881,7 @@ class measure_statistics:
                 model=model,
                 n_layer=model.config.num_hidden_layers,
                 option="norm1",
-                every=4,
+                every=8,
                 world_size=accelerator.num_processes,
             )
 
@@ -943,10 +942,10 @@ class measure_statistics:
             )
             self.stats["ov_0shot"][completed_steps] = ov_0shot
             self.stats["ov_5shot"][completed_steps] = ov_5shot
-            accelerator.print(ov_0shot)
-            accelerator.print(ov_5shot)
-            logger.info(f"iter {completed_steps}. overlap 0 shot: {ov_0shot.values()[-1]:.4f}")
-            logger.info(f"iter {completed_steps}. overlap 5 shot: {ov_5shot.values()[-1]:.4f}")
+            #accelerator.print(ov_0shot)
+            #accelerator.print(ov_5shot)
+            logger.info(f"iter {completed_steps}. overlap 0 shot: {list(ov_0shot.values())[-1]:.4f}")
+            logger.info(f"iter {completed_steps}. overlap 5 shot: {list(ov_5shot.values())[-1]:.4f}")
             sys.stdout.flush()
 
         with open(f"{self.output_dir}/train_statistics.pkl", "wb") as f:

@@ -59,7 +59,7 @@ accelerate launch \
     --output_dir ./results/${MODEL_SIZE}_lora/ \
     --with_tracking \
     --report_to tensorboard \
-    --logging_steps 20 \
-    --eval_steps 20 \
+    --logging_steps 10 \
+    --eval_steps 10 \
     --measure_baselines --measure_overlap \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/llama-2-7b"
