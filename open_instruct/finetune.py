@@ -882,7 +882,7 @@ class measure_statistics:
                 model=model,
                 n_layer=model.config.num_hidden_layers,
                 option="norm1",
-                every=2,
+                every=4,
                 world_size=accelerator.num_processes,
             )
 
@@ -930,6 +930,7 @@ class measure_statistics:
             self.stats["mmlu_val"][completed_steps] = acc
 
         if do_overlap:
+            accelerator.print("overlap computation started")
             ov_0shot, ov_5shot = compute_overlap(
                 accelerator,
                 model,
@@ -944,8 +945,8 @@ class measure_statistics:
             self.stats["ov_5shot"][completed_steps] = ov_5shot
             accelerator.print(ov_0shot)
             accelerator.print(ov_5shot)
-            logger.info(f"iter {completed_steps}. overlap 0 shot: {ov_0shot:.4f}")
-            logger.info(f"iter {completed_steps}. overlap 5 shot: {ov_5shot:.4f}")
+            logger.info(f"iter {completed_steps}. overlap 0 shot: {ov_0shot.values()[-1]:.4f}")
+            logger.info(f"iter {completed_steps}. overlap 5 shot: {ov_5shot.values()[-1]:.4f}")
             sys.stdout.flush()
 
         with open(f"{self.output_dir}/train_statistics.pkl", "wb") as f:
