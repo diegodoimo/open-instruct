@@ -42,9 +42,6 @@ class extract_activations:
         self.hidden_size = 0
 
         self.handles = {}
-        print("rank: nsamples", self.rank, self.nsamples)
-        print("rank: nbatches", self.rank, self.nbatches)
-        sys.stdout.flush()
         if self.rank == 0:
             self.accelerator.print(
                 "before hidden states RAM Used (GB):",
@@ -254,7 +251,7 @@ class extract_activations:
         self.hidden_size += num_current_tokens
         return seq_len
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def extract(self, dataloader, tokenizer):
         is_last_batch = False
 

@@ -930,6 +930,7 @@ class measure_statistics:
             self.stats["mmlu_val"][completed_steps] = acc
 
         if do_overlap:
+            accelerator.print("overlap computation started")
             ov_0shot, ov_5shot = compute_overlap(
                 accelerator,
                 model,

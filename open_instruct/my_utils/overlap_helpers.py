@@ -2,7 +2,9 @@ from collections import defaultdict
 import torch
 from dadapy.data import Data
 from .extract_repr import extract_activations
+from .pairwise_distances import compute_distances
 import sys
+import numpy as np
 
 
 @torch.no_grad()
@@ -37,21 +39,42 @@ def compute_overlap(
     ov_0shot = {}
     ov_5shot = {}
     for i, (name, act) in enumerate(act_dict.items()):
-        d = Data(coordinates=act.to(torch.float32).numpy())
 
-        repr_0shot = torch.load(
-            f"{base_dir}/0shot/l{target_layer_indices[i]}_target.pt"
-        )
-        ov_0shot[name] = d.compute_data_overlap(
-            corrdinates=repr_0shot.to(torch.float32).numpy()
+        # act = act.to(torch.float64).numpy()
+        # act, _, inverse = np.unique(act, axis=0, return_index=True, return_inverse=True)
+
+        # assert act
+
+        distances, dist_index, _, _ = compute_distances(
+            X=act,
+            n_neighbors=50 + 1,
+            n_jobs=1,
+            working_memory=2048,
+            range_scaling=128,
+            argsort=False,
         )
 
-        repr_5shot = torch.load(
-            f"{base_dir}/5shot/l{target_layer_indices[i]}_target.pt"
-        )
-        ov_5shot[name] = d.compute_data_overlap(
-            corrdinates=repr_5shot.to(torch.float32).numpy()
-        )
+        # there are no overlapping datapoints in these representation:
+        # indices_0shot = torch.load(
+        #     f"{base_dir}/0shot/l{target_layer_indices[i]}_target_inverse.pt"
+        # )
+
+        # assert indices_0shot == inverse
+
+        d = Data(distances=(distances, dist_index))
+
+        dist = np.load(f"{base_dir}/0shot/l{target_layer_indices[i]}_dist.npy")
+        indices = np.load(f"{base_dir}/0shot/l{target_layer_indices[i]}_index.npy")
+
+        ov_0shot[name] = d.compute_data_overlap(distances=(dist, indices))
+
+        dist = np.load(f"{base_dir}/5shot/l{target_layer_indices[i]}_dist.npy")
+        indices = np.load(f"{base_dir}/5shot/l{target_layer_indices[i]}_index.npy")
+
+        # repr_5shot = torch.load(
+        #     f"{base_dir}/5shot/l{target_layer_indices[i]}_target.pt"
+        # )
+        ov_5shot[name] = d.compute_data_overlap(distances=(dist, indices))
 
     model.train()
     return ov_0shot, ov_5shot
@@ -100,7 +123,6 @@ def get_embdims(model, dataloader, target_layers):
 
         return hook_fn
 
-
     handles = {}
     for name, module in model.named_modules():
         if name in target_layers:
@@ -114,5 +136,8 @@ def get_embdims(model, dataloader, target_layers):
         if name in target_layers:
             handles[name].remove()
 
-    assert len(embdims) == len(target_layers), (f"num embdims: {len(embdims)}", f"num target layers: {len(target_layers)}")
+    assert len(embdims) == len(target_layers), (
+        f"num embdims: {len(embdims)}",
+        f"num target layers: {len(target_layers)}",
+    )
     return embdims, dtypes
