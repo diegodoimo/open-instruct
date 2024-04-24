@@ -42,15 +42,15 @@ def compute_overlap(
         repr_0shot = torch.load(
             f"{base_dir}/0shot/l{target_layer_indices[i]}_target.pt"
         )
-        ov_0shot[name] = d.compute_data_overlap(
-            corrdinates=repr_0shot.to(torch.float32).numpy()
+        ov_0shot[name] = d.return_data_overlap(
+            coordinates=repr_0shot.to(torch.float32).numpy()
         )
 
         repr_5shot = torch.load(
             f"{base_dir}/5shot/l{target_layer_indices[i]}_target.pt"
         )
-        ov_5shot[name] = d.compute_data_overlap(
-            corrdinates=repr_5shot.to(torch.float32).numpy()
+        ov_5shot[name] = d.return_data_overlap(
+            coordinates=repr_5shot.to(torch.float32).numpy()
         )
 
     model.train()

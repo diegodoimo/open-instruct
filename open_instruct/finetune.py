@@ -677,7 +677,6 @@ def main():
         meter.update(
             accelerator=accelerator,
             model=model,
-            val_loader=val_loader,
             completed_steps=0,
             epoch=0,
             do_overlap=args.measure_overlap,
@@ -875,6 +874,7 @@ class measure_statistics:
         self.stats = defaultdict(dict)
         self.base_dir = base_dir
         self.tokenizer = tokenizer
+        self.val_loader = val_loader
 
         if prepare_for_overlap:
             assert base_dir is not None
@@ -933,7 +933,7 @@ class measure_statistics:
             ov_0shot, ov_5shot = compute_overlap(
                 accelerator,
                 model,
-                val_loader,
+                self.val_loader,
                 self.tokenizer,
                 self.target_layers,
                 self.embdims,
@@ -942,6 +942,8 @@ class measure_statistics:
             )
             self.stats["ov_0shot"][completed_steps] = ov_0shot
             self.stats["ov_5shot"][completed_steps] = ov_5shot
+            accelerator.print(ov_0shot)
+            accelerator.print(ov_5shot)
             logger.info(f"iter {completed_steps}. overlap 0 shot: {ov_0shot:.4f}")
             logger.info(f"iter {completed_steps}. overlap 5 shot: {ov_5shot:.4f}")
             sys.stdout.flush()
