@@ -871,7 +871,7 @@ class measure_statistics:
     ):
 
         self.stats = defaultdict(dict)
-        self.base_dir = base_dir
+        self.output_dir = base_dir
         self.tokenizer = tokenizer
         self.val_loader = val_loader
 
