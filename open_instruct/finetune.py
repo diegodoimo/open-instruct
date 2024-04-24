@@ -236,7 +236,10 @@ def parse_args():
         help="ratio of total training steps used for warmup.",
     )
     parser.add_argument(
-        "--output_dir", type=str, default=None, help="Where to store the final model."
+        "--output_dir", type=str, default='.', help="Where to store the final model."
+    )
+    parser.add_argument(
+        "--out_filename", type=str, default="", help="Where to store the final model."
     )
     parser.add_argument(
         "--seed", type=int, default=None, help="A seed for reproducible training."
@@ -664,13 +667,18 @@ def main():
     # update the progress_bar if load from checkpoint
     # progress_bar.update(completed_steps)
 
+    filename = ""
+    if args.out_filename is not "":
+        filename = "_"+args.out_filename
     meter = measure_statistics(
         model,
         val_loader,
         tokenizer,
         accelerator,
-        base_dir=args.overlap_base_dir,
+        ckpt_dir=args.overlap_base_dir,
+        results_dir=args.output_dir,
         prepare_for_overlap=True,
+        filename=f"{filename}epoch{args.num_train_epochs}"
     )
 
     if args.measure_baselines:
@@ -683,9 +691,9 @@ def main():
         )
 
 
-    accelerate.print("start training")
+    accelerator.print("start training")
     print_memory_consumed()
-    accelerate.print("before train run")
+    accelerator.print("before train run")
     sys.stdout.flush()
     for epoch in range(starting_epoch, args.num_train_epochs):
         meter.update(
@@ -866,17 +874,21 @@ class measure_statistics:
         val_loader,
         tokenizer,
         accelerator,
-        base_dir=None,
+        ckpt_dir=None,
+        results_dir=None,
         prepare_for_overlap=False,
+        filename=""
     ):
 
         self.stats = defaultdict(dict)
-        self.output_dir = base_dir
+        self.results_dir = results_dir
+        self.ckpt_dir = ckpt_dir
         self.tokenizer = tokenizer
         self.val_loader = val_loader
+        self.filename = filename
 
         if prepare_for_overlap:
-            assert base_dir is not None
+            assert ckpt_dir is not None
             target_layers = get_target_layers_llama(
                 model=model,
                 n_layer=model.config.num_hidden_layers,
@@ -938,7 +950,7 @@ class measure_statistics:
                 self.target_layers,
                 self.embdims,
                 self.dtypes,
-                self.base_dir,
+                self.ckpt_dir,
             )
             self.stats["ov_0shot"][completed_steps] = ov_0shot
             self.stats["ov_5shot"][completed_steps] = ov_5shot
@@ -948,8 +960,10 @@ class measure_statistics:
             logger.info(f"iter {completed_steps}. overlap 5 shot: {list(ov_5shot.values())[-1]:.4f}")
             sys.stdout.flush()
 
-        with open(f"{self.output_dir}/train_statistics.pkl", "wb") as f:
+        
+        with open(f"{self.results_dir}/train_statistics_{self.filename}.pkl", "wb") as f:
             pickle.dump(self.stats, f, protocol=pickle.HIGHEST_PROTOCOL)
+
 
 
 if __name__ == "__main__":
