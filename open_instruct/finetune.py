@@ -682,7 +682,6 @@ def main():
             do_overlap=args.measure_overlap,
         )
 
-
     accelerate.print("start training")
     print_memory_consumed()
     accelerate.print("before train run")
@@ -777,7 +776,7 @@ def main():
         meter.update(
             accelerator=accelerator,
             model=model,
-            test_loader=test_loader,
+            val_loader=val_loader,
             completed_steps=completed_steps,
             epoch=epoch,
             do_overlap=args.measure_overlap,
@@ -942,10 +941,14 @@ class measure_statistics:
             )
             self.stats["ov_0shot"][completed_steps] = ov_0shot
             self.stats["ov_5shot"][completed_steps] = ov_5shot
-            #accelerator.print(ov_0shot)
-            #accelerator.print(ov_5shot)
-            logger.info(f"iter {completed_steps}. overlap 0 shot: {list(ov_0shot.values())[-1]:.4f}")
-            logger.info(f"iter {completed_steps}. overlap 5 shot: {list(ov_5shot.values())[-1]:.4f}")
+            # accelerator.print(ov_0shot)
+            # accelerator.print(ov_5shot)
+            logger.info(
+                f"iter {completed_steps}. overlap 0 shot: {list(ov_0shot.values())[-1]:.4f}"
+            )
+            logger.info(
+                f"iter {completed_steps}. overlap 5 shot: {list(ov_5shot.values())[-1]:.4f}"
+            )
             sys.stdout.flush()
 
         with open(f"{self.output_dir}/train_statistics.pkl", "wb") as f:
