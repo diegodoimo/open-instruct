@@ -36,12 +36,12 @@ from my_utils.dataloader_utils import get_dataloader
 from my_utils.optimizer_utils import get_optimizer, get_scheduler
 from my_utils.tokenizer_utils import get_tokenizer
 from my_utils.model_utils import get_model_hf
-from open_instruct.overlap_utils.overlap_helpers import (
+from overlap_utils.overlap_helpers import (
     get_embdims,
     get_target_layers_llama,
     compute_overlap,
 )
-from open_instruct.overlap_utils.extract_repr import extract_activations
+from overlap_utils.extract_repr import extract_activations
 
 # with fully sharded daat parallel if we can make this working
 from accelerate import FullyShardedDataParallelPlugin
@@ -704,6 +704,8 @@ def main():
     accelerator.print("before train run")
     sys.stdout.flush()
 
+    assert False
+
     for epoch in range(starting_epoch, args.num_train_epochs):
         meter.update(
             accelerator=accelerator,
@@ -999,9 +1001,7 @@ class measure_statistics:
                 for norm, norm_val in shot_val.items():
                     for k, k_val in norm_val.items():
                         logger.info(
-                            f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: \
-                                {np.mean(list(overlaps[shot][norm][k].values()[-1].values())
-                                         ):.4f}\n"
+                            f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: {np.mean(list(overlaps[shot][norm][k].values()[-1].values())):.4f}\n"
                         )
 
         self.stats["train_stats"] = self.train_stats
