@@ -999,7 +999,7 @@ class measure_statistics:
                 self.target_layers,
                 self.embdims,
                 self.dtypes,
-                self.ckpt_dir,
+                self.base_indices,
                 self.subjects,
             )
             self.train_stats["overlaps"][completed_steps] = overlaps
