@@ -259,7 +259,7 @@ class extract_activations:
     @torch.no_grad()
     def extract(self, dataloader, tokenizer):
         is_last_batch = False
-
+        inputs = []
         self.predictions = []
         self.constrained_predictions = []
         self.targets = []
@@ -275,11 +275,16 @@ class extract_activations:
 
             _ = self.model(batch)
 
+            assert batch.shape[0] == 1
+            inputs.append(batch.detach().cpu())
+
             if self.world_size > 1:
                 _ = self._gather_and_update_fsdp(mask, is_last_batch)
 
             else:
                 _ = self._update_hidden_state(mask.cpu(), is_last_batch)
+
+        self.hidden_states["inputs"] = torch.cat(inputs)
 
     def remove_hooks(self):
         # remove all hooks
