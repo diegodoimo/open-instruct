@@ -74,15 +74,15 @@ class extract_activations:
         if self.world_size > 1:
 
             def hook_fn(module, input, output):
-                hidden_states[name] = input
+                hidden_states[name] = output
 
         else:
 
             def hook_fn(module, input, output):
                 if isinstance(input, tuple):
-                    hidden_states[name] = input[0].cpu()
+                    hidden_states[name] = output[0].cpu()
                 else:
-                    hidden_states[name] = input.cpu()
+                    hidden_states[name] = output.cpu()
 
         return hook_fn
 

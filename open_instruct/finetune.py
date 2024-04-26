@@ -907,7 +907,7 @@ class measure_statistics:
                 model=model,
                 n_layer=model.config.num_hidden_layers,
                 option="norm1",
-                every=8,
+                every=1,
                 world_size=accelerator.num_processes,
             )
 
@@ -1008,6 +1008,7 @@ class measure_statistics:
                 self.base_indices,
                 self.subjects,
                 self.results_dir,
+                self.filename,
             )
             self.train_stats["overlaps"][completed_steps] = overlaps
             for shot, shot_val in overlaps.items():
