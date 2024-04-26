@@ -36,12 +36,12 @@ from my_utils.dataloader_utils import get_dataloader
 from my_utils.optimizer_utils import get_optimizer, get_scheduler
 from my_utils.tokenizer_utils import get_tokenizer
 from my_utils.model_utils import get_model_hf
-from open_instruct.overlap_utils.overlap_helpers import (
-    get_embdims,
-    get_target_layers_llama,
-    compute_overlap,
-)
-from open_instruct.overlap_utils.extract_repr import extract_activations
+from open_instruct.overlap_utils.overlap_functions import compute_overlap
+from overlap_utils.helpers import get_embdims, get_target_layers_llama
+
+
+
+from overlap_utils.extract_repr import extract_activations
 
 # with fully sharded daat parallel if we can make this working
 from accelerate import FullyShardedDataParallelPlugin
