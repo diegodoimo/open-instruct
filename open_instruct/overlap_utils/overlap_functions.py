@@ -139,9 +139,10 @@ def compute_overlap(
 
     overlaps = defaultdict(dict)
 
-    for shots in base_indices.key():
+    for shots in base_indices.keys():
         for norm in base_indices[shots].keys():
             ov_tmp = defaultdict(dict)
+            accelerator.print(f"ov. {shots}, {norm}")
             for i, (name, act) in enumerate(act_dict.items()):
                 act = act.to(torch.float64).numpy()
 

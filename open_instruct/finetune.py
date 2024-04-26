@@ -920,6 +920,8 @@ class measure_statistics:
                 stats = pickle.load(f)
                 self.subjects = np.array(stats["subjects"])
 
+            accelerator.print("computing base distance matrix")
+            sys.stdout.flush()
             for shots in ["0shot"]:  # , "5shot"]:
                 for norm in ["unnorm"]:  # , "norm"]:
                     layer_indices = defaultdict()
@@ -948,6 +950,9 @@ class measure_statistics:
 
                     
                     self.base_indices[shots][norm] = layer_indices
+            
+            accelerator.print("distance matrix computation finished")
+            sys.stdout.flush()
 
             self.embdims, self.dtypes = get_embdims(
                 model, val_loader, list(target_layers.values())
@@ -1000,15 +1005,16 @@ class measure_statistics:
                 self.target_layers,
                 self.embdims,
                 self.dtypes,
-                self.ckpt_dir,
+                self.base_indices,
                 self.subjects,
             )
             self.train_stats["overlaps"][completed_steps] = overlaps
             for shot, shot_val in overlaps.items():
                 for norm, norm_val in shot_val.items():
                     for k, k_val in norm_val.items():
+                        logger.info(f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: {list(overlaps[shot][norm][k].values())[-1]}\n")
                         logger.info(
-                            f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: {np.mean(list(overlaps[shot][norm][k].values()[-1].values())):.4f}\n"
+                            f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: {np.mean(list(list(overlaps[shot][norm][k].values())[-1].values())):.4f}\n"
                         )
 
         self.stats["train_stats"] = self.train_stats
