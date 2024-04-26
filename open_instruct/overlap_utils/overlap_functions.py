@@ -95,7 +95,6 @@ def return_data_overlap(
     overlaps_full = c_ov._compute_data_overlap(
         ndata, k, indices_base.astype(int), indices_other.astype(int)
     )
-    
 
     overlaps = {}
     for subject in np.unique(subjects):
@@ -116,6 +115,7 @@ def compute_overlap(
     dtypes,
     base_indices,
     subjects,
+    results_dir,
 ):
     target_layer_names = list(target_layers.values())
 
@@ -144,6 +144,7 @@ def compute_overlap(
             ov_tmp = defaultdict(dict)
             accelerator.print(f"ov. {shots}, {norm}")
             for i, (name, act) in enumerate(act_dict.items()):
+                torch.save(act, f"{results_dir}/{name}.pt")
                 act = act.to(torch.float64).numpy()
 
                 if norm == "norm":
@@ -155,14 +156,14 @@ def compute_overlap(
 
                 _, dist_index, _, _ = compute_distances(
                     X=act,
-                    n_neighbors=300 + 1,
+                    n_neighbors=40 + 1,
                     n_jobs=1,
                     working_memory=2048,
-                    range_scaling=300 + 1,
+                    range_scaling=40 + 1,
                     argsort=False,
                 )
 
-                for k in [10, 30, 300]:
+                for k in [30]:
                     ov_tmp[name][k] = return_data_overlap(
                         indices_base=dist_index,
                         indices_other=base_indices[shots][norm][name],

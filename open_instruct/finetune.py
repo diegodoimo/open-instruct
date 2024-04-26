@@ -23,8 +23,6 @@ import sys
 import time
 
 
-
-
 from collections import defaultdict
 
 
@@ -940,17 +938,16 @@ class measure_statistics:
 
                         _, dist_index, _, _ = compute_distances(
                             X=act,
-                            n_neighbors=300 + 1,
+                            n_neighbors=40 + 1,
                             n_jobs=1,
                             working_memory=2048,
-                            range_scaling=300 + 1,
+                            range_scaling=40 + 1,
                             argsort=False,
                         )
                         layer_indices[name] = dist_index
 
-                    
                     self.base_indices[shots][norm] = layer_indices
-            
+
             accelerator.print("distance matrix computation finished")
             sys.stdout.flush()
 
@@ -1007,12 +1004,15 @@ class measure_statistics:
                 self.dtypes,
                 self.base_indices,
                 self.subjects,
+                self.results_dir
             )
             self.train_stats["overlaps"][completed_steps] = overlaps
             for shot, shot_val in overlaps.items():
                 for norm, norm_val in shot_val.items():
                     for k, k_val in norm_val.items():
-                        logger.info(f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: {list(overlaps[shot][norm][k].values())[-1]}\n")
+                        logger.info(
+                            f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: {list(overlaps[shot][norm][k].values())[-1]}\n"
+                        )
                         logger.info(
                             f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: {np.mean(list(list(overlaps[shot][norm][k].values())[-1].values())):.4f}\n"
                         )
