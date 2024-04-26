@@ -23,6 +23,11 @@ import sys
 import time
 
 
+
+
+from collections import defaultdict
+
+
 # *******************************************************************************
 
 from my_utils.dataloader_utils import get_dataloader
@@ -909,15 +914,16 @@ class measure_statistics:
             )
 
             self.target_layers = target_layers
-            self.base_indices = defaultdict()
+            self.base_indices = defaultdict(dict)
 
             with open(f"{ckpt_dir}/0shot/statistics_target.pkl", "rb") as f:
                 stats = pickle.load(f)
                 self.subjects = np.array(stats["subjects"])
 
-            for index, name in target_layers.items():
-                for shots in ["0shot"]:  # , "5shot"]:
-                    for norm in ["unnorm"]:  # , "norm"]:
+            for shots in ["0shot"]:  # , "5shot"]:
+                for norm in ["unnorm"]:  # , "norm"]:
+                    layer_indices = defaultdict()
+                    for index, name in target_layers.items():
 
                         act = torch.load(f"{ckpt_dir}/{shots}/l{index}_target.pt")
                         act = act.to(torch.float64).numpy()
@@ -938,8 +944,10 @@ class measure_statistics:
                             range_scaling=300 + 1,
                             argsort=False,
                         )
+                        layer_indices[name] = dist_index
 
-                        self.base_indices[shots][norm][name] = dist_index
+                    
+                    self.base_indices[shots][norm] = layer_indices
 
             self.embdims, self.dtypes = get_embdims(
                 model, val_loader, list(target_layers.values())

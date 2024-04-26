@@ -137,12 +137,13 @@ def compute_overlap(
 
     act_dict = extr_act.hidden_states
 
-    overlaps = defaultdict()
-    for i, (name, act) in enumerate(act_dict.items()):
+    overlaps = defaultdict(dict)
 
-        act = act.to(torch.float64).numpy()
-        for shots in base_indices.key():
-            for norm in base_indices[shots].keys():
+    for shots in base_indices.key():
+        for norm in base_indices[shots].keys():
+            ov_tmp = defaultdict(dict)
+            for i, (name, act) in enumerate(act_dict.items()):
+                act = act.to(torch.float64).numpy()
 
                 if norm == "norm":
                     assert len(act.shape()) == 2, act.shape()
@@ -160,13 +161,15 @@ def compute_overlap(
                     argsort=False,
                 )
 
-        for k in [10, 30, 300]:
-            overlaps[shots][norm][k][name] = return_data_overlap(
-                indices_base=dist_index,
-                indices_other=base_indices[shots][norm][name],
-                subjects=subjects,
-                k=k,
-            )
+                for k in [10, 30, 300]:
+                    ov_tmp[name][k] = return_data_overlap(
+                        indices_base=dist_index,
+                        indices_other=base_indices[shots][norm][name],
+                        subjects=subjects,
+                        k=k,
+                    )
+
+            overlaps[shots][norm] = ov_tmp
 
     model.train()
     return overlaps
