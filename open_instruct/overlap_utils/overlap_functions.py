@@ -95,9 +95,10 @@ def return_data_overlap(
     overlaps_full = c_ov._compute_data_overlap(
         ndata, k, indices_base.astype(int), indices_other.astype(int)
     )
+    
 
     overlaps = {}
-    for subject in subjects:
+    for subject in np.unique(subjects):
         mask = subject == subjects
         overlaps[subject] = np.mean(overlaps_full[mask])
 
