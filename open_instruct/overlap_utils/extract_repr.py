@@ -79,7 +79,10 @@ class extract_activations:
         else:
 
             def hook_fn(module, input, output):
-                hidden_states[name] = input.cpu()
+                if isinstance(input, tuple):
+                    hidden_states[name] = input[0].cpu()
+                else:
+                    hidden_states[name] = input.cpu()
 
         return hook_fn
 
