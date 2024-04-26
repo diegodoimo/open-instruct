@@ -41,11 +41,9 @@ from my_utils.dataloader_utils import get_dataloader
 from my_utils.optimizer_utils import get_optimizer, get_scheduler
 from my_utils.tokenizer_utils import get_tokenizer
 from my_utils.model_utils import get_model_hf
-from open_instruct.overlap_utils.overlap_functions import compute_overlap
+
+from overlap_utils.overlap_functions import compute_overlap
 from overlap_utils.helpers import get_embdims, get_target_layers_llama
-
-
-
 from overlap_utils.extract_repr import extract_activations
 
 # with fully sharded daat parallel if we can make this working
@@ -678,10 +676,10 @@ def main():
         filename = "_" + args.out_filename
 
     stats = defaultdict()
-    stats["num_epochs"] = args.num_apochs
+    stats["num_epochs"] = args.num_train_epochs
     stats["lr"] = args.learning_rate
     stats["scheduler"] = args.lr_scheduler_type
-    stats["batch_size"] = args.bacth_size
+    stats["batch_size"] = args.batch_size
 
     meter = measure_statistics(
         stats,
@@ -708,6 +706,8 @@ def main():
     print_memory_consumed()
     accelerator.print("before train run")
     sys.stdout.flush()
+
+    assert False
 
     for epoch in range(starting_epoch, args.num_train_epochs):
         meter.update(
@@ -916,15 +916,18 @@ class measure_statistics:
             self.target_layers = target_layers
             self.base_indices = defaultdict(dict)
 
-            with open(f"{ckpt_dir}/0shot/statistics.pkl", "rb") as f:
-                self.subjects = pickle.load(f)
+            with open(f"{ckpt_dir}/0shot/statistics_target.pkl", "rb") as f:
+                stats = pickle.load(f)
+                self.subjects = np.array(stats["subjects"])
 
+            accelerator.print("computing base distance matrix")
+            sys.stdout.flush()
             for shots in ["0shot"]:  # , "5shot"]:
                 for norm in ["unnorm"]:  # , "norm"]:
                     layer_indices = defaultdict()
                     for index, name in target_layers.items():
 
-                        act = torch.load(f"{ckpt_dir}/{shots}/l{index}_target_dist.pt")
+                        act = torch.load(f"{ckpt_dir}/{shots}/l{index}_target.pt")
                         act = act.to(torch.float64).numpy()
 
                         if norm == "norm":
@@ -947,6 +950,9 @@ class measure_statistics:
 
                     
                     self.base_indices[shots][norm] = layer_indices
+            
+            accelerator.print("distance matrix computation finished")
+            sys.stdout.flush()
 
             self.embdims, self.dtypes = get_embdims(
                 model, val_loader, list(target_layers.values())
@@ -1006,10 +1012,9 @@ class measure_statistics:
             for shot, shot_val in overlaps.items():
                 for norm, norm_val in shot_val.items():
                     for k, k_val in norm_val.items():
+                        logger.info(f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: {list(overlaps[shot][norm][k].values())[-1]}\n")
                         logger.info(
-                            f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: \
-                                {np.mean(list(overlaps[shot][norm][k].values()[-1].values())
-                                         ):.4f}\n"
+                            f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: {np.mean(list(list(overlaps[shot][norm][k].values())[-1].values())):.4f}\n"
                         )
 
         self.stats["train_stats"] = self.train_stats

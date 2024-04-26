@@ -95,9 +95,10 @@ def return_data_overlap(
     overlaps_full = c_ov._compute_data_overlap(
         ndata, k, indices_base.astype(int), indices_other.astype(int)
     )
+    
 
     overlaps = {}
-    for subject in subjects:
+    for subject in np.unique(subjects):
         mask = subject == subjects
         overlaps[subject] = np.mean(overlaps_full[mask])
 
@@ -138,9 +139,10 @@ def compute_overlap(
 
     overlaps = defaultdict(dict)
 
-    for shots in base_indices.key():
+    for shots in base_indices.keys():
         for norm in base_indices[shots].keys():
             ov_tmp = defaultdict(dict)
+            accelerator.print(f"ov. {shots}, {norm}")
             for i, (name, act) in enumerate(act_dict.items()):
                 act = act.to(torch.float64).numpy()
 
