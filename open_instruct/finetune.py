@@ -36,12 +36,12 @@ from my_utils.dataloader_utils import get_dataloader
 from my_utils.optimizer_utils import get_optimizer, get_scheduler
 from my_utils.tokenizer_utils import get_tokenizer
 from my_utils.model_utils import get_model_hf
-from my_utils.overlap_helpers import (
+from open_instruct.overlap_utils.overlap_helpers import (
     get_embdims,
     get_target_layers_llama,
     compute_overlap,
 )
-from my_utils.extract_repr import extract_activations
+from open_instruct.overlap_utils.extract_repr import extract_activations
 
 # with fully sharded daat parallel if we can make this working
 from accelerate import FullyShardedDataParallelPlugin
@@ -61,6 +61,7 @@ from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from collections import defaultdict
 from dadapy.data import Data
 import pickle
+from overlap_utils.pairwise_distances import compute_distances
 
 # *******************************************************************
 
@@ -236,7 +237,10 @@ def parse_args():
         help="ratio of total training steps used for warmup.",
     )
     parser.add_argument(
-        "--output_dir", type=str, default=None, help="Where to store the final model."
+        "--output_dir", type=str, default=".", help="Where to store the final model."
+    )
+    parser.add_argument(
+        "--out_filename", type=str, default="", help="Where to store the final model."
     )
     parser.add_argument(
         "--seed", type=int, default=None, help="A seed for reproducible training."
@@ -664,13 +668,26 @@ def main():
     # update the progress_bar if load from checkpoint
     # progress_bar.update(completed_steps)
 
+    filename = ""
+    if args.out_filename != "":
+        filename = "_" + args.out_filename
+
+    stats = defaultdict()
+    stats["num_epochs"] = args.num_apochs
+    stats["lr"] = args.learning_rate
+    stats["scheduler"] = args.lr_scheduler_type
+    stats["batch_size"] = args.bacth_size
+
     meter = measure_statistics(
+        stats,
         model,
         val_loader,
         tokenizer,
         accelerator,
-        base_dir=args.overlap_base_dir,
+        ckpt_dir=args.overlap_base_dir,
+        results_dir=args.output_dir,
         prepare_for_overlap=True,
+        filename=f"{filename}epoch{args.num_train_epochs}",
     )
 
     if args.measure_baselines:
@@ -682,10 +699,11 @@ def main():
             do_overlap=args.measure_overlap,
         )
 
-    accelerate.print("start training")
+    accelerator.print("start training")
     print_memory_consumed()
-    accelerate.print("before train run")
+    accelerator.print("before train run")
     sys.stdout.flush()
+
     for epoch in range(starting_epoch, args.num_train_epochs):
         meter.update(
             accelerator=accelerator,
@@ -861,21 +879,27 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 class measure_statistics:
     def __init__(
         self,
+        stats,
         model,
         val_loader,
         tokenizer,
         accelerator,
-        base_dir=None,
+        ckpt_dir=None,
+        results_dir=None,
         prepare_for_overlap=False,
+        filename="",
     ):
 
-        self.stats = defaultdict(dict)
-        self.base_dir = base_dir
+        self.stats = stats
+        self.train_stats = defaultdict(dict)
+        self.results_dir = results_dir
+        self.ckpt_dir = ckpt_dir
         self.tokenizer = tokenizer
         self.val_loader = val_loader
+        self.filename = filename
 
         if prepare_for_overlap:
-            assert base_dir is not None
+            assert ckpt_dir is not None
             target_layers = get_target_layers_llama(
                 model=model,
                 n_layer=model.config.num_hidden_layers,
@@ -885,6 +909,36 @@ class measure_statistics:
             )
 
             self.target_layers = target_layers
+            self.base_indices = defaultdict()
+
+            with open(f"{ckpt_dir}/0shot/statistics.pkl", "rb") as f:
+                self.subjects = pickle.load(f)
+
+            for index, name in target_layers.items():
+                for shots in ["0shot"]:  # , "5shot"]:
+                    for norm in ["unnorm"]:  # , "norm"]:
+
+                        act = torch.load(f"{ckpt_dir}/{shots}/l{index}_target_dist.pt")
+                        act = act.to(torch.float64).numpy()
+
+                        if norm == "norm":
+                            assert len(act.shape()) == 2, act.shape()
+
+                            act = act / np.linalg.norm(act, axis=1, keepdims=True)
+                            assert np.all(
+                                np.linalg.norm(act, axis=1) == np.ones(act.shape[0])
+                            ), np.linalg.norm(act, axis=1)
+
+                        _, dist_index, _, _ = compute_distances(
+                            X=act,
+                            n_neighbors=300 + 1,
+                            n_jobs=1,
+                            working_memory=2048,
+                            range_scaling=300 + 1,
+                            argsort=False,
+                        )
+
+                        self.base_indices[shots][norm][name] = dist_index
 
             self.embdims, self.dtypes = get_embdims(
                 model, val_loader, list(target_layers.values())
@@ -902,10 +956,10 @@ class measure_statistics:
         do_overlap=False,
     ):
 
-        self.stats["epoch"][completed_steps] = epoch
-        self.stats["iter"][completed_steps] = completed_steps
+        self.train_stats["epoch"][completed_steps] = epoch
+        self.train_stats["iter"][completed_steps] = completed_steps
         if loss is not None:
-            self.stats["loss"][completed_steps] = loss
+            self.train_stats["loss"][completed_steps] = loss
 
         if val_loader is not None:
             acc = evaluate(
@@ -915,7 +969,7 @@ class measure_statistics:
                 restrict_targets=True,
             )
             logger.info(f"iter {completed_steps}. mmlu val accuracy: {acc:.4f}")
-            self.stats["mmlu_val"][completed_steps] = acc
+            self.train_stats["mmlu_val"][completed_steps] = acc
 
         if test_loader is not None:
             acc = evaluate(
@@ -925,11 +979,11 @@ class measure_statistics:
                 restrict_targets=True,
             )
             logger.info(f"mmlu test accuracy after epoch {epoch}: {acc:.4f}")
-            self.stats["mmlu_val"][completed_steps] = acc
+            self.train_stats["mmlu_val"][completed_steps] = acc
 
         if do_overlap:
             accelerator.print("overlap computation started")
-            ov_0shot, ov_5shot = compute_overlap(
+            overlaps = compute_overlap(
                 accelerator,
                 model,
                 self.val_loader,
@@ -937,21 +991,23 @@ class measure_statistics:
                 self.target_layers,
                 self.embdims,
                 self.dtypes,
-                self.base_dir,
+                self.ckpt_dir,
+                self.subjects,
             )
-            self.stats["ov_0shot"][completed_steps] = ov_0shot
-            self.stats["ov_5shot"][completed_steps] = ov_5shot
-            # accelerator.print(ov_0shot)
-            # accelerator.print(ov_5shot)
-            logger.info(
-                f"iter {completed_steps}. overlap 0 shot: {list(ov_0shot.values())[-1]:.4f}"
-            )
-            logger.info(
-                f"iter {completed_steps}. overlap 5 shot: {list(ov_5shot.values())[-1]:.4f}"
-            )
-            sys.stdout.flush()
+            self.train_stats["overlaps"][completed_steps] = overlaps
+            for shot, shot_val in overlaps.items():
+                for norm, norm_val in shot_val.items():
+                    for k, k_val in norm_val.items():
+                        logger.info(
+                            f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: \
+                                {np.mean(list(overlaps[shot][norm][k].values()[-1].values())
+                                         ):.4f}\n"
+                        )
 
-        with open(f"{self.output_dir}/train_statistics.pkl", "wb") as f:
+        self.stats["train_stats"] = self.train_stats
+        with open(
+            f"{self.results_dir}/train_statistics_{self.filename}.pkl", "wb"
+        ) as f:
             pickle.dump(self.stats, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
