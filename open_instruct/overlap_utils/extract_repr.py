@@ -74,12 +74,12 @@ class extract_activations:
         if self.world_size > 1:
 
             def hook_fn(module, input, output):
-                hidden_states[name] = output
+                hidden_states[name] = input
 
         else:
 
             def hook_fn(module, input, output):
-                hidden_states[name] = output.cpu()
+                hidden_states[name] = input.cpu()
 
         return hook_fn
 
@@ -229,9 +229,11 @@ class extract_activations:
         for i, (name, activations) in enumerate(self.hidden_states_tmp.items()):
             if self.use_last_token:
                 batch_size = seq_len.shape[0]
-                act_tmp = activations[
-                    torch.arange(batch_size), torch.tensor(seq_len) - 1
-                ].clone().detach()
+                act_tmp = (
+                    activations[torch.arange(batch_size), torch.tensor(seq_len) - 1]
+                    .clone()
+                    .detach()
+                )
             else:
                 denom = torch.sum(mask, dim=1)  # batch x 1
                 # act_tmp -> batch x seq_len x embed

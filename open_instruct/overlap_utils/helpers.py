@@ -21,9 +21,10 @@ def get_target_layers_llama(model, n_layer, option="norm1", every=1, world_size=
             middle = "._fsdp_wrapped_module"
 
     target_layers = {
-        i: f"{prefix}model.layers.{i}{middle}{suffix}" for i in range(1, n_layer, every)
+        i: f"{prefix}model.layers.{i}{middle}{suffix}" for i in range(0, n_layer, every)
     }
 
+    target_layers[-1] = f"{prefix}input_embeddings"
     target_layers[n_layer] = f"{prefix}model.norm"
     target_layers[n_layer + 1] = f"{prefix}lm_head"
 
@@ -41,8 +42,8 @@ def get_embdims(model, dataloader, target_layers):
 
     def get_hook(name, embdims):
         def hook_fn(module, input, output):
-            embdims[name] = output.shape[-1]
-            dtypes[name] = output.dtype
+            embdims[name] = input.shape[-1]
+            dtypes[name] = input.dtype
 
         return hook_fn
 
