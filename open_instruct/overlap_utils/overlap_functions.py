@@ -119,7 +119,7 @@ def compute_overlap(
     filename,
 ):
     target_layer_names = list(target_layers.values())
-
+    name_to_idx = {val: key for key, val in target_layers.items()}
     model.eval()
     extr_act = extract_activations(
         accelerator,
@@ -143,41 +143,44 @@ def compute_overlap(
     for i, (name, act) in enumerate(act_dict.items()):
         torch.save(act, f"{results_dir}/{name}{filename}.pt")
 
-    # for shots in base_indices.keys():
-    #     for norm in base_indices[shots].keys():
-    #         ov_tmp = defaultdict(dict)
-    #         accelerator.print(f"ov. {shots}, {norm}")
-    #         for i, (name, act) in enumerate(act_dict.items()):
-    #             torch.save(act, f"{results_dir}/{name}{filename}.pt")
-    #             act = act.to(torch.float64).numpy()
-    #     if i < 1:
-    #         continue
-    #     else:
-    #         if norm == "norm":
-    #             assert len(act.shape()) == 2, act.shape()
-    #             act = act / np.linalg.norm(act, axis=1, keepdims=True)
-    #             assert np.all(
-    #                 np.linalg.norm(act, axis=1) == np.ones(act.shape[0])
-    #             ), np.linalg.norm(act, axis=1)
+    for shots in base_indices.keys():
+        for norm in base_indices[shots].keys():
 
-    #         _, dist_index, _, _ = compute_distances(
-    #             X=act,
-    #             n_neighbors=40 + 1,
-    #             n_jobs=1,
-    #             working_memory=2048,
-    #             range_scaling=40 + 1,
-    #             argsort=False,
-    #         )
+            ov_tmp = defaultdict(dict)
 
-    #         for k in [30]:
-    #             ov_tmp[name][k] = return_data_overlap(
-    #                 indices_base=dist_index,
-    #                 indices_other=base_indices[shots][norm][name],
-    #                 subjects=subjects,
-    #                 k=k,
-    #             )
+            accelerator.print(f"ov. {shots}, {norm}")
+            for i, (name, act) in enumerate(act_dict.items()):
+                # torch.save(act, f"{results_dir}/{name}{filename}.pt")
+                act = act.to(torch.float64).numpy()
 
-    # overlaps[shots][norm] = ov_tmp
+                if i < 1:
+                    continue
+                else:
+                    if norm == "norm":
+                        assert len(act.shape()) == 2, act.shape()
+                        act = act / np.linalg.norm(act, axis=1, keepdims=True)
+                        assert np.all(
+                            np.linalg.norm(act, axis=1) == np.ones(act.shape[0])
+                        ), np.linalg.norm(act, axis=1)
+
+                    _, dist_index, _, _ = compute_distances(
+                        X=act,
+                        n_neighbors=40 + 1,
+                        n_jobs=1,
+                        working_memory=2048,
+                        range_scaling=40 + 1,
+                        argsort=False,
+                    )
+
+                    for k in [30]:
+                        ov_tmp[name][k] = return_data_overlap(
+                            indices_base=dist_index,
+                            indices_other=base_indices[norm][name_to_idx[name]],
+                            subjects=subjects,
+                            k=k,
+                        )
+
+    overlaps[shots][norm] = ov_tmp
 
     model.train()
     return overlaps
