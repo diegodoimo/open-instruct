@@ -918,38 +918,38 @@ class measure_statistics:
                 stats = pickle.load(f)
                 self.subjects = np.array(stats["subjects"])
 
-            accelerator.print("computing base distance matrix")
-            sys.stdout.flush()
-            for shots in ["0shot"]:  # , "5shot"]:
-                for norm in ["unnorm"]:  # , "norm"]:
-                    layer_indices = defaultdict()
-                    for index, name in target_layers.items():
-                        if index < 1:
-                            continue
-                        else:
+            # accelerator.print("computing base distance matrix")
+            # sys.stdout.flush()
+            # for shots in ["0shot"]:  # , "5shot"]:
+            #     for norm in ["unnorm"]:  # , "norm"]:
+            #         layer_indices = defaultdict()
+            #         for index, name in target_layers.items():
+            #             if index < 1:
+            #                 continue
+            #             else:
 
-                            act = torch.load(f"{ckpt_dir}/{shots}/l{index}_target.pt")
-                            act = act.to(torch.float64).numpy()
+            #                 act = torch.load(f"{ckpt_dir}/{shots}/l{index}_target.pt")
+            #                 act = act.to(torch.float64).numpy()
 
-                            if norm == "norm":
-                                assert len(act.shape()) == 2, act.shape()
+            #                 if norm == "norm":
+            #                     assert len(act.shape()) == 2, act.shape()
 
-                                act = act / np.linalg.norm(act, axis=1, keepdims=True)
-                                assert np.all(
-                                    np.linalg.norm(act, axis=1) == np.ones(act.shape[0])
-                                ), np.linalg.norm(act, axis=1)
+            #                     act = act / np.linalg.norm(act, axis=1, keepdims=True)
+            #                     assert np.all(
+            #                         np.linalg.norm(act, axis=1) == np.ones(act.shape[0])
+            #                     ), np.linalg.norm(act, axis=1)
 
-                            _, dist_index, _, _ = compute_distances(
-                                X=act,
-                                n_neighbors=40 + 1,
-                                n_jobs=1,
-                                working_memory=2048,
-                                range_scaling=40 + 1,
-                                argsort=False,
-                            )
-                            layer_indices[name] = dist_index
+            #                 _, dist_index, _, _ = compute_distances(
+            #                     X=act,
+            #                     n_neighbors=40 + 1,
+            #                     n_jobs=1,
+            #                     working_memory=2048,
+            #                     range_scaling=40 + 1,
+            #                     argsort=False,
+            #                 )
+            #                 layer_indices[name] = dist_index
 
-                    self.base_indices[shots][norm] = layer_indices
+            #         self.base_indices[shots][norm] = layer_indices
 
             accelerator.print("distance matrix computation finished")
             sys.stdout.flush()
