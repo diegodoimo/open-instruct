@@ -1009,6 +1009,7 @@ class measure_statistics:
                 self.subjects,
                 self.results_dir,
                 self.filename,
+                self.ckpt_dir,
             )
             self.train_stats["overlaps"][completed_steps] = overlaps
             for shot, shot_val in overlaps.items():

@@ -117,6 +117,7 @@ def compute_overlap(
     subjects,
     results_dir,
     filename,
+    ckpt_dir,
 ):
     target_layer_names = list(target_layers.values())
     name_to_idx = {val: key for key, val in target_layers.items()}
@@ -152,6 +153,11 @@ def compute_overlap(
 
             accelerator.print(f"ov. {shots}, {norm}")
             for i, (name, act) in enumerate(act_dict.items()):
+                act_base = torch.load(
+                    f"{ckpt_dir}/{shots}/l{name_to_idx[name]}_target.pt"
+                )
+                torch.testing.assert_close(act_base, act)
+
                 act = act.to(torch.float64).numpy()
 
                 if name_to_idx[name] < 1:
