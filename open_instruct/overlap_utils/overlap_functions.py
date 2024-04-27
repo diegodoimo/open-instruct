@@ -125,14 +125,16 @@ def compute_overlap(
 
     model.eval()
     extr_act = extract_activations(
-        accelerator,
-        model,
-        val_loader,
-        target_layer_names,
-        embdims,
-        dtypes,
+        accelerator=accelerator,
+        model=model,
+        dataloader=val_loader,
+        target_layers=target_layer_names,
+        embdim=embdims,
+        dtypes=dtypes,
         use_last_token=True,
+        print_every=200
     )
+
     extr_act.extract(val_loader, tokenizer)
     extr_act.remove_hooks()
 
@@ -145,6 +147,8 @@ def compute_overlap(
 
     for i, (name, act) in enumerate(act_dict.items()):
         torch.save(act, f"{results_dir}/{name}{filename}.pt")
+    
+    print(f"{results_dir}/{name}{filename}.pt\n")
 
     # dirpath_actual = (
     #     "/u/area/ddoimo/ddoimo/finetuning_llm/open-instruct/results/llama-2-7b"
@@ -171,7 +175,7 @@ def compute_overlap(
             accelerator.print(f"ov. {shots}, {norm}")
             for i, (name, act) in enumerate(act_dict.items()):
                 act_base = torch.load(
-                    f"{ckpt_dir}/{shots}/l{name_to_idx[name]}_hook_output_target.pt"
+                    f"{ckpt_dir}/{shots}/l{name_to_idx[name]}_target.pt"
                 )
                 # print(f"base_path: {ckpt_dir}/{shots}/l{name_to_idx[name]}_hook_output_target.pt")
                 # #torch.testing.assert_close(act_base, expected)

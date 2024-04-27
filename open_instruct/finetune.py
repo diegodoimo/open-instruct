@@ -683,6 +683,7 @@ def main():
         stats,
         model,
         val_loader,
+        test_loader,
         tokenizer,
         accelerator,
         ckpt_dir=args.overlap_base_dir,
@@ -711,10 +712,10 @@ def main():
         meter.update(
             accelerator=accelerator,
             model=model,
-            val_loader=val_loader,
             completed_steps=0,
             epoch=0,
             do_overlap=False,
+            do_val=True,
         )
 
         model.train()
@@ -885,6 +886,7 @@ class measure_statistics:
         stats,
         model,
         val_loader,
+        test_loader,
         tokenizer,
         accelerator,
         ckpt_dir=None,
@@ -899,6 +901,7 @@ class measure_statistics:
         self.ckpt_dir = ckpt_dir
         self.tokenizer = tokenizer
         self.val_loader = val_loader
+        self.test_loader = test_loader
         self.filename = filename
 
         if prepare_for_overlap:
@@ -929,7 +932,7 @@ class measure_statistics:
                         else:
                             print(f"layer {index}")
                             sys.stdout.flush()
-                            act = torch.load(f"{ckpt_dir}/{shots}/l{index}_hook_output_target.pt")
+                            act = torch.load(f"{ckpt_dir}/{shots}/l{index}_target.pt")
                             act = act.to(torch.float64).numpy()
 
                             if norm == "norm":
@@ -965,10 +968,10 @@ class measure_statistics:
         model,
         completed_steps,
         epoch,
-        val_loader=None,
-        test_loader=None,
         loss=None,
         do_overlap=False,
+        do_val = False,
+        do_test = False,
     ):
 
         self.train_stats["epoch"][completed_steps] = epoch
@@ -976,20 +979,20 @@ class measure_statistics:
         if loss is not None:
             self.train_stats["loss"][completed_steps] = loss
 
-        if val_loader is not None:
+        if do_val:
             acc = evaluate(
                 model=model,
-                dataloader=val_loader,
+                dataloader=self.val_loader,
                 tokenizer=self.tokenizer,
                 restrict_targets=True,
             )
             logger.info(f"iter {completed_steps}. mmlu val accuracy: {acc:.4f}")
             self.train_stats["mmlu_val"][completed_steps] = acc
 
-        if test_loader is not None:
+        if do_test:
             acc = evaluate(
                 model=model,
-                dataloader=test_loader,
+                dataloader=self.test_loader,
                 tokenizer=self.tokenizer,
                 restrict_targets=True,
             )
@@ -1001,7 +1004,7 @@ class measure_statistics:
             overlaps = compute_overlap(
                 accelerator=accelerator,
                 model=model,
-                val_loader=val_loader,
+                val_loader=self.val_loader,
                 tokenizer=self.tokenizer,
                 target_layers=self.target_layers,
                 embdims=self.embdims,
