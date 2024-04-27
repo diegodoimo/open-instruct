@@ -998,18 +998,18 @@ class measure_statistics:
         if do_overlap:
             accelerator.print("overlap computation started")
             overlaps = compute_overlap(
-                accelerator,
-                model,
-                self.val_loader,
-                self.tokenizer,
-                self.target_layers,
-                self.embdims,
-                self.dtypes,
-                self.base_indices,
-                self.subjects,
-                self.results_dir,
-                self.filename,
-                self.ckpt_dir,
+                accelerator=accelerator,
+                model=model,
+                val_loader=val_loader,
+                tokenizer=self.tokenizer,
+                target_layers=self.target_layers,
+                embdims=self.embdims,
+                dtypes=self.dtypes,
+                base_indices=self.base_indices,
+                subjects=self.subjects,
+                results_dir=self.results_dir,
+                filename=self.filename,
+                ckpt_dir=self.ckpt_dir,
             )
             self.train_stats["overlaps"][completed_steps] = overlaps
             for shot, shot_val in overlaps.items():
