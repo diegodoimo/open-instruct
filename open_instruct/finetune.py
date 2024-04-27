@@ -927,8 +927,9 @@ class measure_statistics:
                         if index < 1:
                             continue
                         else:
-
-                            act = torch.load(f"{ckpt_dir}/{shots}/l{index}_target.pt")
+                            print(f"layer {index}")
+                            sys.stdout.flush()
+                            act = torch.load(f"{ckpt_dir}/{shots}/l{index}_hook_output_target.pt")
                             act = act.to(torch.float64).numpy()
 
                             if norm == "norm":

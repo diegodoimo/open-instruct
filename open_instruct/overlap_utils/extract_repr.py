@@ -275,8 +275,9 @@ class extract_activations:
 
             _ = self.model(batch)
 
-            assert batch.shape[0] == 1
-            inputs.append(batch.detach().cpu())
+            #assert batch.shape[0] == 1
+            #batch = batch.detach().cpu()
+            #inputs.extend([torch.tensor([b]) for b in batch[0]])
 
             if self.world_size > 1:
                 _ = self._gather_and_update_fsdp(mask, is_last_batch)
@@ -284,7 +285,7 @@ class extract_activations:
             else:
                 _ = self._update_hidden_state(mask.cpu(), is_last_batch)
 
-        self.hidden_states["inputs"] = torch.cat(inputs)
+        #self.hidden_states["inputs"] = torch.cat(inputs)
 
     def remove_hooks(self):
         # remove all hooks
