@@ -153,7 +153,7 @@ def compute_overlap(
                 # torch.save(act, f"{results_dir}/{name}{filename}.pt")
                 act = act.to(torch.float64).numpy()
 
-                if i < 1:
+                if name_to_idx[name] < 1:
                     continue
                 else:
                     if norm == "norm":
@@ -162,7 +162,7 @@ def compute_overlap(
                         assert np.all(
                             np.linalg.norm(act, axis=1) == np.ones(act.shape[0])
                         ), np.linalg.norm(act, axis=1)
-
+                    
                     _, dist_index, _, _ = compute_distances(
                         X=act,
                         n_neighbors=40 + 1,
@@ -175,7 +175,7 @@ def compute_overlap(
                     for k in [30]:
                         ov_tmp[name][k] = return_data_overlap(
                             indices_base=dist_index,
-                            indices_other=base_indices[norm][name_to_idx[name]],
+                            indices_other=base_indices[shots][norm][name_to_idx[name]],
                             subjects=subjects,
                             k=k,
                         )
