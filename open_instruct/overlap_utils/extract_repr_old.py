@@ -1,4 +1,3 @@
-import time
 import torch
 import numpy as np
 from collections import defaultdict
@@ -42,9 +41,6 @@ class extract_activations:
         self.global_batch_size = self.world_size * self.micro_batch_size
         self.hidden_size = 0
 
-        print("rank: nsamples", self.rank, self.nsamples)
-        print("rank: nbatches", self.rank, self.nbatches)
-        sys.stdout.flush()
         self.handles = {}
         if self.rank == 0:
             self.accelerator.print(
@@ -83,7 +79,10 @@ class extract_activations:
         else:
 
             def hook_fn(module, input, output):
-                hidden_states[name] = output.cpu()
+                if isinstance(input, tuple):
+                    hidden_states[name] = output[0].cpu()
+                else:
+                    hidden_states[name] = output.cpu()
 
         return hook_fn
 
@@ -233,9 +232,11 @@ class extract_activations:
         for i, (name, activations) in enumerate(self.hidden_states_tmp.items()):
             if self.use_last_token:
                 batch_size = seq_len.shape[0]
-                act_tmp = activations[
-                    torch.arange(batch_size), torch.tensor(seq_len) - 1
-                ]
+                act_tmp = (
+                    activations[torch.arange(batch_size), torch.tensor(seq_len) - 1]
+                    .clone()
+                    .detach()
+                )
             else:
                 denom = torch.sum(mask, dim=1)  # batch x 1
                 # act_tmp -> batch x seq_len x embed
@@ -255,23 +256,13 @@ class extract_activations:
         self.hidden_size += num_current_tokens
         return seq_len
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def extract(self, dataloader, tokenizer):
-        start = time.time()
         is_last_batch = False
-        choices = ["A", "B", "C", "D"]
-
+        inputs = []
         self.predictions = []
         self.constrained_predictions = []
         self.targets = []
-
-        logit_list, batch_list = [], []
-        # entries in the vocabulary space restriced to the 4 output options.
-        # space is added (see prompt construction)
-
-        candidate_token_ids = tokenizer(
-            choices, add_special_tokens=False, return_tensors="pt"
-        ).input_ids.flatten()
 
         for i, data in enumerate(dataloader):
             if (i + 1) == self.nbatches:
@@ -280,14 +271,21 @@ class extract_activations:
             mask = data["attention_mask"] != 0
             mask = mask.to("cuda")
             batch = data["input_ids"].to("cuda")
+            _ = data["labels"].to("cuda")
 
             _ = self.model(batch)
+
+            #assert batch.shape[0] == 1
+            #batch = batch.detach().cpu()
+            #inputs.extend([torch.tensor([b]) for b in batch[0]])
 
             if self.world_size > 1:
                 _ = self._gather_and_update_fsdp(mask, is_last_batch)
 
             else:
                 _ = self._update_hidden_state(mask.cpu(), is_last_batch)
+
+        #self.hidden_states["inputs"] = torch.cat(inputs)
 
     def remove_hooks(self):
         # remove all hooks

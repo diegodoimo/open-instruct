@@ -146,20 +146,22 @@ def compute_overlap(
     for i, (name, act) in enumerate(act_dict.items()):
         torch.save(act, f"{results_dir}/{name}{filename}.pt")
 
-    dirpath_actual = '/u/area/ddoimo/ddoimo/finetuning_llm/open-instruct/results/llama-2-7b'
-    actual = torch.load(f"{dirpath_actual}/base_model.model.model.layers.0.input_layernorm_outepoch2.pt")
+    # dirpath_actual = (
+    #     "/u/area/ddoimo/ddoimo/finetuning_llm/open-instruct/results/llama-2-7b"
+    # )
+    # actual = torch.load(
+    #     f"{dirpath_actual}/base_model.model.model.layers.0.input_layernorm_outepoch2.pt"
+    # )
 
-    print(dirpath_actual)
+    # print(dirpath_actual)
 
-    dirpath_original = "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/llama-2-7b/0shot"
-    print("{dirpath original}")
-    expected = torch.load(f"{dirpath_original}/l0_hook_output_target.pt")
+    # dirpath_original = "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/llama-2-7b/0shot"
+    # print("{dirpath original}")
+    # expected = torch.load(f"{dirpath_original}/l0_hook_output_target.pt")
 
-    torch.testing.assert_close(actual, expected)
+    # torch.testing.assert_close(actual, expected)
 
-    print("actual and original match\n")
-
-
+    # print("actual and original match\n")
 
     for shots in base_indices.keys():
         for norm in base_indices[shots].keys():
@@ -171,20 +173,18 @@ def compute_overlap(
                 act_base = torch.load(
                     f"{ckpt_dir}/{shots}/l{name_to_idx[name]}_hook_output_target.pt"
                 )
-                print(f"base_path: {ckpt_dir}/{shots}/l{name_to_idx[name]}_hook_output_target.pt")
-                #torch.testing.assert_close(act_base, expected)
-                print(f"testing base match\n")
+                # print(f"base_path: {ckpt_dir}/{shots}/l{name_to_idx[name]}_hook_output_target.pt")
+                # #torch.testing.assert_close(act_base, expected)
+                # print(f"testing base match\n")
 
-                print(f"actual path: {results_dir}/{name}{filename}.pt\n")
-                print(f"testing actual array")
-                #torch.testing.assert_close(act, actual)
-                print(f"current arrays match\n")
-                #sys.stdout.flush()
+                # print(f"actual path: {results_dir}/{name}{filename}.pt\n")
+                # print(f"testing actual array")
+                # #torch.testing.assert_close(act, actual)
+                # print(f"current arrays match\n")
+                # #sys.stdout.flush()
 
-                print(f"testing base vs actual")
+                # print(f"testing base vs actual")
                 torch.testing.assert_close(act_base, act)
-                print(f"base actual match\n")
-                sys.stdout.flush()
 
                 act = act.to(torch.float64).numpy()
 
@@ -197,7 +197,7 @@ def compute_overlap(
                         assert np.all(
                             np.linalg.norm(act, axis=1) == np.ones(act.shape[0])
                         ), np.linalg.norm(act, axis=1)
-                    
+
                     _, dist_index, _, _ = compute_distances(
                         X=act,
                         n_neighbors=40 + 1,
