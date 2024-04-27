@@ -120,6 +120,8 @@ def compute_overlap(
 ):
     target_layer_names = list(target_layers.values())
     name_to_idx = {val: key for key, val in target_layers.items()}
+    print(name_to_idx)
+
     model.eval()
     extr_act = extract_activations(
         accelerator,
@@ -150,10 +152,9 @@ def compute_overlap(
 
             accelerator.print(f"ov. {shots}, {norm}")
             for i, (name, act) in enumerate(act_dict.items()):
-                # torch.save(act, f"{results_dir}/{name}{filename}.pt")
                 act = act.to(torch.float64).numpy()
 
-                if i < 1:
+                if name_to_idx[name] < 1:
                     continue
                 else:
                     if norm == "norm":
