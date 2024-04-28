@@ -13,7 +13,7 @@ def get_target_layers_llama(model, n_layer, option="norm1", every=1, world_size=
     names = [name for name, _ in model.named_modules()]
 
     prefix = "base_model.model."
-    prefix = ""
+    #prefix = ""
     middle = ""
 
     if world_size > 1:
