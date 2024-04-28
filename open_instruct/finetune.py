@@ -427,9 +427,8 @@ def main():
     if args.seed is not None:
         set_seed(args.seed)
 
-    if accelerator.is_main_process:
-        if args.output_dir is not None:
-            os.makedirs(args.output_dir, exist_ok=True)
+    if accelerator.is_main_process and args.output_dir is not None:
+        os.makedirs(args.output_dir, exist_ok=True)
 
     accelerator.wait_for_everyone()
     world_size = accelerator.num_processes
@@ -437,25 +436,25 @@ def main():
     # *******************************************************
     # # Load pretrained model and tokenizer
 
-    model = get_model_no_lora(
-        model_name_or_path=args.model_name_or_path,
-        precision=torch.bfloat16,
-        low_cpu_mem_usage=args.low_cpu_mem_usage,
-        accelerator=accelerator,
-    )
-
-    # model = get_model_hf(
-    #     accelerator=accelerator,
+    # model = get_model_no_lora(
     #     model_name_or_path=args.model_name_or_path,
-    #     config_name=args.config_name,
+    #     precision=torch.bfloat16,
     #     low_cpu_mem_usage=args.low_cpu_mem_usage,
-    #     torch_dtype=torch.bfloat16,
-    #     use_lora=args.use_lora,
-    #     lora_rank=args.lora_rank,
-    #     lora_alpha=args.lora_alpha,
-    #     lora_dropout=args.lora_dropout,
-    #     use_flash_attention=False,
+    #     accelerator=accelerator,
     # )
+
+    model = get_model_hf(
+        accelerator=accelerator,
+        model_name_or_path=args.model_name_or_path,
+        config_name=args.config_name,
+        low_cpu_mem_usage=args.low_cpu_mem_usage,
+        torch_dtype=torch.bfloat16,
+        use_lora=args.use_lora,
+        lora_rank=args.lora_rank,
+        lora_alpha=args.lora_alpha,
+        lora_dropout=args.lora_dropout,
+        use_flash_attention=False,
+    )
 
     tokenizer = get_tokenizer(
         tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
@@ -504,7 +503,7 @@ def main():
         accelerator=accelerator,
         subject=None,
         num_processes=args.preprocessing_num_workers,
-        split="train",
+        split="dev",
     ).construct_dataset()
 
     val_dataset, longest_seq = MMLU_Dataset(
@@ -713,8 +712,6 @@ def main():
     accelerator.print("before train run")
     sys.stdout.flush()
 
-    assert False
-
     for epoch in range(starting_epoch, args.num_train_epochs):
         meter.update(
             accelerator=accelerator,
@@ -786,7 +783,6 @@ def main():
                     meter.update(
                         accelerator=accelerator,
                         model=model,
-                        val_loader=val_loader,
                         completed_steps=completed_steps,
                         epoch=epoch,
                         do_overlap=args.measure_overlap,
@@ -805,27 +801,26 @@ def main():
         meter.update(
             accelerator=accelerator,
             model=model,
-            val_loader=val_loader,
             completed_steps=completed_steps,
             epoch=epoch,
             do_overlap=args.measure_overlap,
         )
         print_memory_consumed()
 
-        if args.checkpointing_steps == "epoch":
-            output_dir = f"epoch_{epoch}"
-            if args.output_dir is not None:
-                output_dir = os.path.join(args.output_dir, output_dir)
-            save_with_accelerate(accelerator, model, output_dir, args)
+        # save model
+        output_dir = f"epoch_{epoch}"
+        if args.output_dir is not None:
+            output_dir = os.path.join(args.output_dir, output_dir)
+        save_with_accelerate(accelerator, model, output_dir, args)
 
     if args.with_tracking:
         accelerator.end_training()
 
-    if args.output_dir is not None:
-        accelerator.wait_for_everyone()
-        if accelerator.is_main_process:
-            tokenizer.save_pretrained(args.output_dir)
-        save_with_accelerate(accelerator, model, args.output_dir, args)
+    # if args.output_dir is not None:
+    #     accelerator.wait_for_everyone()
+    #     if accelerator.is_main_process:
+    #         tokenizer.save_pretrained(args.output_dir)
+    #     save_with_accelerate(accelerator, model, args.output_dir, args)
 
 
 # FSDP has issues with `inference_mode`
@@ -977,8 +972,8 @@ class measure_statistics:
         epoch,
         loss=None,
         do_overlap=False,
-        do_val = False,
-        do_test = False,
+        do_val=False,
+        do_test=False,
     ):
 
         self.train_stats["epoch"][completed_steps] = epoch

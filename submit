@@ -60,9 +60,9 @@ accelerate launch \
     --output_dir ./results/${model_name}/ \
     --logging_steps 10 \
     --eval_steps 10 \
-    --measure_baselines --measure_overlap \
+    --measure_baselines \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/llama-2-7b" \
-    --out_filename "out" \
+    --out_filename "" \
 #--learning_rate 1e-4 \
     #--with_tracking \
     #--report_to tensorboard \
