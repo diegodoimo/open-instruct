@@ -38,7 +38,7 @@ from my_utils.dataset_utils import (
 from my_utils.dataloader_utils import get_dataloader
 from my_utils.optimizer_utils import get_optimizer, get_scheduler
 from my_utils.tokenizer_utils import get_tokenizer
-from my_utils.model_utils import get_model_hf
+from my_utils.model_utils import get_model_hf, get_model_no_lora
 
 from overlap_utils.overlap_functions import compute_overlap
 from overlap_utils.helpers import get_embdims, get_target_layers_llama
@@ -437,18 +437,25 @@ def main():
     # *******************************************************
     # # Load pretrained model and tokenizer
 
-    model = get_model_hf(
-        accelerator=accelerator,
+    model = get_model_no_lora(
         model_name_or_path=args.model_name_or_path,
-        config_name=args.config_name,
+        precision=torch.bfloat16,
         low_cpu_mem_usage=args.low_cpu_mem_usage,
-        torch_dtype=torch.bfloat16,
-        use_lora=args.use_lora,
-        lora_rank=args.lora_rank,
-        lora_alpha=args.lora_alpha,
-        lora_dropout=args.lora_dropout,
-        use_flash_attention=False,
+        accelerator=accelerator,
     )
+
+    # model = get_model_hf(
+    #     accelerator=accelerator,
+    #     model_name_or_path=args.model_name_or_path,
+    #     config_name=args.config_name,
+    #     low_cpu_mem_usage=args.low_cpu_mem_usage,
+    #     torch_dtype=torch.bfloat16,
+    #     use_lora=args.use_lora,
+    #     lora_rank=args.lora_rank,
+    #     lora_alpha=args.lora_alpha,
+    #     lora_dropout=args.lora_dropout,
+    #     use_flash_attention=False,
+    # )
 
     tokenizer = get_tokenizer(
         tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
