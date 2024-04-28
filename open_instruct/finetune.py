@@ -503,7 +503,7 @@ def main():
         accelerator=accelerator,
         subject=None,
         num_processes=args.preprocessing_num_workers,
-        split="dev",
+        split="train",
     ).construct_dataset()
 
     val_dataset, longest_seq = MMLU_Dataset(
@@ -742,6 +742,7 @@ def main():
         start = time.time()
         for step, batch in enumerate(active_dataloader):
             with accelerator.accumulate(model):
+
                 outputs = model(**batch, use_cache=False)
                 loss = outputs.loss
                 # We keep track of the loss at each logged step

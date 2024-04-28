@@ -671,10 +671,10 @@ class MMLU_Dataset:
         self.accelerator.print("loading dataset")
 
         split = self.split
-        # if self.split == "train":
-        #     # training on the dev + val datasets
-        #     split = "dev"
-        #     assert self.num_few_shots == 0
+        if self.split == "train":
+            # training on the dev + validation datasets
+            split = "dev"
+            assert self.num_few_shots == 0
 
         if self.num_samples is not None:
             split = f"test[:{self.num_samples}]"
