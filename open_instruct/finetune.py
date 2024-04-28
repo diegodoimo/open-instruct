@@ -527,6 +527,9 @@ def main():
     ).construct_dataset()
 
     # ******************************************************************************************
+    # ignore the issue of pad token in Llamas
+    assert args.per_device_train_batch_size == 1
+    assert args.per_device_eval_batch_size == 1
 
     # # DataLoaders creation:
     train_loader, train_sampler = get_dataloader(
@@ -694,7 +697,7 @@ def main():
         accelerator,
         ckpt_dir=args.overlap_base_dir,
         results_dir=args.output_dir,
-        prepare_for_overlap=True,
+        prepare_for_overlap=False,
         filename=f"{filename}epoch{args.num_train_epochs}",
     )
 
