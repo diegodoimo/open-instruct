@@ -770,8 +770,6 @@ def main():
                     logger.info(
                         f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
                     )
-                    sys.stdout.flush()
-
                     if args.with_tracking:
                         accelerator.log(
                             {
