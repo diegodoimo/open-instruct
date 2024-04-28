@@ -789,6 +789,7 @@ def main():
                         model=model,
                         completed_steps=completed_steps,
                         epoch=epoch,
+                        do_val =True,
                         do_overlap=args.measure_overlap,
                     )
 
@@ -807,6 +808,7 @@ def main():
             model=model,
             completed_steps=completed_steps,
             epoch=epoch,
+            do_test=True,
             do_overlap=args.measure_overlap,
         )
         print_memory_consumed()

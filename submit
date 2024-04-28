@@ -47,7 +47,7 @@ accelerate launch \
     --max_seq_length 1024 \
     --batch_size $TOTAL_BATCH_SIZE \
     --preprocessing_num_workers 16 \
-    --checkpointing_steps epoch \
+    --checkpointing_steps 10 \
     --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 1 \
     --gradient_accumulation_steps $GRADIENT_ACC_STEPS \
