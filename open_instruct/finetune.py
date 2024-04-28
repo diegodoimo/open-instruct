@@ -697,7 +697,7 @@ def main():
         accelerator,
         ckpt_dir=args.overlap_base_dir,
         results_dir=args.output_dir,
-        prepare_for_overlap=False,
+        prepare_for_overlap=args.measure_overlap,
         filename=f"{filename}epoch{args.num_train_epochs}",
     )
 
@@ -721,7 +721,7 @@ def main():
             model=model,
             completed_steps=0,
             epoch=0,
-            do_overlap=False,
+            do_overlap=args.measure_overlap,
             do_val=True,
         )
 
@@ -787,7 +787,7 @@ def main():
                         model=model,
                         completed_steps=completed_steps,
                         epoch=epoch,
-                        do_val =True,
+                        do_val=True,
                         do_overlap=args.measure_overlap,
                     )
 
@@ -927,17 +927,15 @@ class measure_statistics:
                 stats = pickle.load(f)
                 self.subjects = np.array(stats["subjects"])
 
-            accelerator.print("computing base distance matrix")
+            accelerator.print("preparing for overlap")
             sys.stdout.flush()
-            for shots in ["0shot"]:  # , "5shot"]:
+            for shots in ["0shot", "5shot"]:
                 for norm in ["unnorm"]:  # , "norm"]:
                     layer_indices = defaultdict()
                     for index, name in target_layers.items():
                         if index < 1:
                             continue
                         else:
-                            print(f"layer {index}")
-                            sys.stdout.flush()
                             act = torch.load(f"{ckpt_dir}/{shots}/l{index}_target.pt")
                             act = act.to(torch.float64).numpy()
 
@@ -961,7 +959,7 @@ class measure_statistics:
 
                     self.base_indices[shots][norm] = layer_indices
 
-            accelerator.print("distance matrix computation finished")
+            accelerator.print("preparation finished")
             sys.stdout.flush()
 
             self.embdims, self.dtypes = get_embdims(
@@ -1026,7 +1024,7 @@ class measure_statistics:
                 for norm, norm_val in shot_val.items():
                     for k, k_val in norm_val.items():
                         logger.info(
-                            f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: {list(overlaps[shot][norm][k].values())[-1]}\n"
+                            f"iter {completed_steps}. overlap with subjects outputs {shot}, {norm}, {k}: {list(overlaps[shot][norm][k].values())[-1]}\n"
                         )
                         logger.info(
                             f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: {np.mean(list(list(overlaps[shot][norm][k].values())[-1].values())):.4f}\n"

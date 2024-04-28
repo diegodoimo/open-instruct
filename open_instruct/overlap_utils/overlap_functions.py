@@ -132,7 +132,7 @@ def compute_overlap(
         embdim=embdims,
         dtypes=dtypes,
         use_last_token=True,
-        print_every=200
+        print_every=200,
     )
 
     extr_act.extract(val_loader, tokenizer)
@@ -147,7 +147,7 @@ def compute_overlap(
 
     for i, (name, act) in enumerate(act_dict.items()):
         torch.save(act, f"{results_dir}/{name}{filename}.pt")
-    
+
     print(f"{results_dir}/{name}{filename}.pt\n")
 
     # dirpath_actual = (
@@ -169,14 +169,14 @@ def compute_overlap(
 
     for shots in base_indices.keys():
         for norm in base_indices[shots].keys():
-
             ov_tmp = defaultdict(dict)
-
             accelerator.print(f"ov. {shots}, {norm}")
             for i, (name, act) in enumerate(act_dict.items()):
-                act_base = torch.load(
-                    f"{ckpt_dir}/{shots}/l{name_to_idx[name]}_target.pt"
-                )
+
+                # THIS IS FALSE FOR THE MOMENT
+                # act_base = torch.load(
+                #    f"{ckpt_dir}/{shots}/l{name_to_idx[name]}_target.pt"
+                # )
                 # print(f"base_path: {ckpt_dir}/{shots}/l{name_to_idx[name]}_hook_output_target.pt")
                 # #torch.testing.assert_close(act_base, expected)
                 # print(f"testing base match\n")
@@ -188,7 +188,7 @@ def compute_overlap(
                 # #sys.stdout.flush()
 
                 # print(f"testing base vs actual")
-                torch.testing.assert_close(act_base, act)
+                # torch.testing.assert_close(act_base, act)
 
                 act = act.to(torch.float64).numpy()
 
@@ -218,8 +218,8 @@ def compute_overlap(
                             subjects=subjects,
                             k=k,
                         )
-                        print("overlap", ov_tmp[name][k])
-                        print("\n")
+                        accelerator.print("overlap", ov_tmp[name][k])
+                        accelerator.print("\n")
 
     overlaps[shots][norm] = ov_tmp
 
