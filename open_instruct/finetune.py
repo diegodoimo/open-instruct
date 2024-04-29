@@ -447,14 +447,9 @@ def main():
     model = get_model_hf(
         accelerator=accelerator,
         model_name_or_path=args.model_name_or_path,
-        config_name=args.config_name,
         low_cpu_mem_usage=args.low_cpu_mem_usage,
-        torch_dtype=torch.bfloat16,
-        use_lora=args.use_lora,
-        lora_rank=args.lora_rank,
-        lora_alpha=args.lora_alpha,
-        lora_dropout=args.lora_dropout,
-        use_flash_attention=False,
+        precision=torch.bfloat16,
+        use_flash_attention_2=False,
     )
 
     if args.use_lora:
@@ -483,10 +478,6 @@ def main():
             )
             model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
-
-    tokenizer = get_tokenizer(
-        tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
-    )
 
     tokenizer = get_tokenizer(
         tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
@@ -647,6 +638,9 @@ def main():
         ].value
         accelerator.init_trackers("open_instruct", experiment_config)
 
+    # ****************************************************************************************
+
+    # ****************************************************************************************
     # Train!
     total_batch_size = (
         args.per_device_train_batch_size
@@ -666,49 +660,15 @@ def main():
     logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
 
-    # Only show the progress bar once on each machine.
-    # progress_bar = tqdm(
-    #    range(args.max_train_steps), disable=not accelerator.is_local_main_process
-    # )
+    # ****************************************************************************************
     completed_steps = 0
     starting_epoch = 0
 
-    # Potentially load in the weights and states from a previous save
-    if args.resume_from_checkpoint:
-        if args.resume_from_checkpoint is not None or args.resume_from_checkpoint != "":
-            checkpoint_path = args.resume_from_checkpoint
-            path = os.path.basename(args.resume_from_checkpoint)
-        else:
-            # Get the most recent checkpoint
-            dirs = [f.name for f in os.scandir(os.getcwd()) if f.is_dir()]
-            dirs.sort(key=os.path.getctime)
-            path = dirs[
-                -1
-            ]  # Sorts folders by date modified, most recent checkpoint is the last
-            checkpoint_path = path
-            path = os.path.basename(checkpoint_path)
-
-        accelerator.print(f"Resumed from checkpoint: {checkpoint_path}")
-        accelerator.load_state(path)
-        # Extract `epoch_{i}` or `step_{i}`
-        training_difference = os.path.splitext(path)[0]
-
-        if "epoch" in training_difference:
-            starting_epoch = int(training_difference.replace("epoch_", "")) + 1
-            resume_step = None
-            completed_steps = starting_epoch * num_update_steps_per_epoch
-        else:
-            # need to multiply `gradient_accumulation_steps` to reflect real steps
-            resume_step = (
-                int(training_difference.replace("step_", ""))
-                * args.gradient_accumulation_steps
-            )
-            starting_epoch = resume_step // len(train_dataloader)
-            completed_steps = resume_step // args.gradient_accumulation_steps
-            resume_step -= starting_epoch * len(train_dataloader)
-
-    # update the progress_bar if load from checkpoint
-    # progress_bar.update(completed_steps)
+    # save pretrained model for double check
+    output_dir = f"epoch_0"
+    if args.output_dir is not None:
+        output_dir = os.path.join(args.output_dir, output_dir)
+    save_with_accelerate(accelerator, model, output_dir, args)
 
     filename = ""
     if args.out_filename != "":
@@ -747,6 +707,8 @@ def main():
     accelerator.print("before train run")
     sys.stdout.flush()
 
+    # *******************************************************************************
+
     for epoch in range(starting_epoch, args.num_train_epochs):
         meter.update(
             accelerator=accelerator,
@@ -759,17 +721,7 @@ def main():
 
         model.train()
         total_loss = 0
-        if (
-            args.resume_from_checkpoint
-            and epoch == starting_epoch
-            and resume_step is not None
-        ):
-            # We skip the first `n` batches in the dataloader when resuming from a checkpoint
-            active_dataloader = accelerator.skip_first_batches(
-                train_dataloader, resume_step
-            )
-        else:
-            active_dataloader = train_dataloader
+        active_dataloader = train_dataloader
 
         start = time.time()
         for step, batch in enumerate(active_dataloader):
@@ -836,7 +788,7 @@ def main():
         print_memory_consumed()
 
         # save model
-        output_dir = f"epoch_{epoch}"
+        output_dir = f"epoch_{epoch+1}"
         if args.output_dir is not None:
             output_dir = os.path.join(args.output_dir, output_dir)
         save_with_accelerate(accelerator, model, output_dir, args)
