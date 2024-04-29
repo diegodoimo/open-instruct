@@ -96,12 +96,12 @@ def return_data_overlap(
         ndata, k, indices_base.astype(int), indices_other.astype(int)
     )
 
-    overlaps = {}
-    for subject in np.unique(subjects):
-        mask = subject == subjects
-        overlaps[subject] = np.mean(overlaps_full[mask])
+    # overlaps = {}
+    # for subject in np.unique(subjects):
+    #     mask = subject == subjects
+    #     overlaps[subject] = np.mean(overlaps_full[mask])
 
-    return overlaps
+    return np.mean(overlaps_full)
 
 
 @torch.no_grad()
@@ -143,7 +143,6 @@ def compute_overlap(
     act_dict = extr_act.hidden_states
 
     overlaps = defaultdict(dict)
-
     for i, (name, act) in enumerate(act_dict.items()):
         torch.save(act, f"{results_dir}/{name}{filename}.pt")
 
@@ -167,60 +166,33 @@ def compute_overlap(
     # print("actual and original match\n")
 
     for shots in base_indices.keys():
-        for norm in base_indices[shots].keys():
-            ov_tmp = defaultdict(dict)
-            accelerator.print(f"ov. {shots}, {norm}")
-            for i, (name, act) in enumerate(act_dict.items()):
+        # for norm in base_indices[shots].keys():
+        # ov_tmp = defaultdict(dict)
+        ov_tmp = defaultdict()
+        for i, (name, act) in enumerate(act_dict.items()):
+            act = act.to(torch.float64).numpy()
 
-                # THIS IS FALSE FOR THE MOMENT
-                # act_base = torch.load(
-                #    f"{ckpt_dir}/{shots}/l{name_to_idx[name]}_target.pt"
-                # )
-                # print(f"base_path: {ckpt_dir}/{shots}/l{name_to_idx[name]}_hook_output_target.pt")
-                # #torch.testing.assert_close(act_base, expected)
-                # print(f"testing base match\n")
+            if name_to_idx[name] < 1:
+                continue
+            else:
+                _, dist_index, _, _ = compute_distances(
+                    X=act,
+                    n_neighbors=40 + 1,
+                    n_jobs=1,
+                    working_memory=2048,
+                    range_scaling=40 + 1,
+                    argsort=False,
+                )
 
-                # print(f"actual path: {results_dir}/{name}{filename}.pt\n")
-                # print(f"testing actual array")
-                # #torch.testing.assert_close(act, actual)
-                # print(f"current arrays match\n")
-                # #sys.stdout.flush()
+                ov_tmp[name] = return_data_overlap(
+                    indices_base=dist_index,
+                    indices_other=base_indices[shots][name_to_idx[name]],
+                    subjects=subjects,
+                    k=30,
+                )
 
-                # print(f"testing base vs actual")
-                # torch.testing.assert_close(act_base, act)
 
-                act = act.to(torch.float64).numpy()
-
-                if name_to_idx[name] < 1:
-                    continue
-                else:
-                    if norm == "norm":
-                        assert len(act.shape()) == 2, act.shape()
-                        act = act / np.linalg.norm(act, axis=1, keepdims=True)
-                        assert np.all(
-                            np.linalg.norm(act, axis=1) == np.ones(act.shape[0])
-                        ), np.linalg.norm(act, axis=1)
-
-                    _, dist_index, _, _ = compute_distances(
-                        X=act,
-                        n_neighbors=40 + 1,
-                        n_jobs=1,
-                        working_memory=2048,
-                        range_scaling=40 + 1,
-                        argsort=False,
-                    )
-
-                    for k in [30]:
-                        ov_tmp[name][k] = return_data_overlap(
-                            indices_base=dist_index,
-                            indices_other=base_indices[shots][norm][name_to_idx[name]],
-                            subjects=subjects,
-                            k=k,
-                        )
-                        #accelerator.print("overlap", ov_tmp[name][k])
-                        #accelerator.print("\n")
-
-    overlaps[shots][norm] = ov_tmp
+        overlaps[shots] = ov_tmp
 
     model.train()
     return overlaps

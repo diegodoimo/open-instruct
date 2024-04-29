@@ -930,34 +930,33 @@ class measure_statistics:
             accelerator.print("preparing for overlap")
             sys.stdout.flush()
             for shots in ["0shot", "5shot"]:
-                for norm in ["unnorm"]:  # , "norm"]:
-                    layer_indices = defaultdict()
-                    for index, name in target_layers.items():
-                        if index < 1:
-                            continue
-                        else:
-                            act = torch.load(f"{ckpt_dir}/{shots}/l{index}_target.pt")
-                            act = act.to(torch.float64).numpy()
+                layer_indices = defaultdict()
+                for index, name in target_layers.items():
+                    if index < 1:
+                        continue
+                    else:
+                        act = torch.load(f"{ckpt_dir}/{shots}/l{index}_target.pt")
+                        act = act.to(torch.float64).numpy()
 
-                            if norm == "norm":
-                                assert len(act.shape()) == 2, act.shape()
+                        # if norm == "norm":  normalization to be evaluated ex post
+                        #     assert len(act.shape()) == 2, act.shape()
 
-                                act = act / np.linalg.norm(act, axis=1, keepdims=True)
-                                assert np.all(
-                                    np.linalg.norm(act, axis=1) == np.ones(act.shape[0])
-                                ), np.linalg.norm(act, axis=1)
+                        #     act = act / np.linalg.norm(act, axis=1, keepdims=True)
+                        #     assert np.all(
+                        #         np.linalg.norm(act, axis=1) == np.ones(act.shape[0])
+                        #     ), np.linalg.norm(act, axis=1)
 
-                            _, dist_index, _, _ = compute_distances(
-                                X=act,
-                                n_neighbors=40 + 1,
-                                n_jobs=1,
-                                working_memory=2048,
-                                range_scaling=40 + 1,
-                                argsort=False,
-                            )
-                            layer_indices[index] = dist_index
+                        _, dist_index, _, _ = compute_distances(
+                            X=act,
+                            n_neighbors=40 + 1,
+                            n_jobs=1,
+                            working_memory=2048,
+                            range_scaling=40 + 1,
+                            argsort=False,
+                        )
+                        layer_indices[index] = dist_index
 
-                    self.base_indices[shots][norm] = layer_indices
+                self.base_indices[shots] = layer_indices
 
             accelerator.print("preparation finished")
             sys.stdout.flush()
@@ -1021,14 +1020,17 @@ class measure_statistics:
             )
             self.train_stats["overlaps"][completed_steps] = overlaps
             for shot, shot_val in overlaps.items():
-                for norm, norm_val in shot_val.items():
-                    for k, k_val in norm_val.items():
-                        #logger.info(
-                        #    f"iter {completed_steps}. overlap with subjects outputs {shot}, {norm}, {k}: {list(overlaps[shot][norm][k].values())[-1]}\n"
-                        #)
-                        logger.info(
-                            f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: {np.mean(list(list(overlaps[shot][norm][k].values())[-1].values())):.4f}\n"
-                        )
+                logger.info(
+                    f"iter {completed_steps}. overlap with subjects outputs {shot}: {list(overlaps[shot].values())[-1]}\n"
+                )
+                # for norm, norm_val in shot_val.items():
+                #     for k, k_val in norm_val.items():
+                #         logger.info(
+                #             f"iter {completed_steps}. overlap with subjects outputs {shot}, {norm}, {k}: {list(overlaps[shot][norm][k].values())[-1]}\n"
+                #         )
+                #         logger.info(
+                #             f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: {np.mean(list(list(overlaps[shot][norm][k].values())[-1].values())):.4f}\n"
+                #         )
 
         self.stats["train_stats"] = self.train_stats
         with open(
