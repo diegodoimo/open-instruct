@@ -33,7 +33,7 @@ accelerate launch \
     --num_machines 1 \
     --num_processes $NUM_GPUS \
     --dynamo_backend 'no' \
-   open_instruct/overlap_finetunes.py \
+   open_instruct/overlap_finetuned.py \
     --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v2/models_hf/$model_name \
     --use_lora \
     --lora_rank 64 \
@@ -51,7 +51,7 @@ accelerate launch \
     --per_device_eval_batch_size 1 \
     --measure_baselines \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
-    --ckpt_dir "/u/area/ddoimo/ddoimo/finetuning_llm/open-instruct/results/$model_name/epoch_0" \
+    --resume_from_checkpoint "/u/area/ddoimo/ddoimo/finetuning_llm/open-instruct/results/$model_name/epoch_1" \
     --output_dir ./results/${model_name}/ \
     --out_filename "" \
 

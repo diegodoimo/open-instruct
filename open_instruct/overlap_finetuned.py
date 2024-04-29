@@ -336,15 +336,6 @@ def parse_args():
     args = parser.parse_args()
 
     # Sanity checks
-    if args.dataset_name is None and args.train_file is None:
-        raise ValueError("Need either a dataset name or a training file.")
-    else:
-        if args.train_file is not None:
-            extension = args.train_file.split(".")[-1]
-            assert extension in [
-                "json",
-                "jsonl",
-            ], "`train_file` should be a json/jsonl file."
     return args
 
 
@@ -507,25 +498,27 @@ def main():
     # ************************************************************************
 
     # Prepare everything with `accelerator`.
+    model.load_adapter(args.resume_from_checkpoint)
     model = accelerator.prepare(model)
     model_name = args.model_name_or_path.split("/")[-1]
 
     # Potentially load in the weights and states from a previous save
-    if args.resume_from_checkpoint is not None or args.resume_from_checkpoint != "":
-        checkpoint_path = args.resume_from_checkpoint
-        path = os.path.basename(args.resume_from_checkpoint)
-    else:
-        # Get the most recent checkpoint
-        dirs = [f.name for f in os.scandir(os.getcwd()) if f.is_dir()]
-        dirs.sort(key=os.path.getctime)
-        path = dirs[
-            -1
-        ]  # Sorts folders by date modified, most recent checkpoint is the last
-        checkpoint_path = path
-        path = os.path.basename(checkpoint_path)
+    #if args.resume_from_checkpoint is not None or args.resume_from_checkpoint != "":
+    #    checkpoint_path = args.resume_from_checkpoint
+    #   #path = os.path.basename(args.resume_from_checkpoint)
+    #else:
+    #    # Get the most recent checkpoint
+    #    dirs = [f.name for f in os.scandir(os.getcwd()) if f.is_dir()]
+    #    dirs.sort(key=os.path.getctime)
+    #    path = dirs[
+    #        -1
+    #    ]  # Sorts folders by date modified, most recent checkpoint is the last
+    #    checkpoint_path = path
+    #    path = os.path.basename(checkpoint_path)
 
-    accelerator.print(f"Resumed from checkpoint: {checkpoint_path}")
-    accelerator.load_state(path)
+    #accelerator.print(f"Resumed from checkpoint: {checkpoint_path}")
+    #accelerator.print(f"Resumed from checkpoint: {path}")
+    #accelerator.load_state(checkpoint_path)
 
     filename = ""
     if args.out_filename != "":
