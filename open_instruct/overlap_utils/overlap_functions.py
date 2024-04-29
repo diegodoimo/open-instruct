@@ -121,7 +121,6 @@ def compute_overlap(
 ):
     target_layer_names = list(target_layers.values())
     name_to_idx = {val: key for key, val in target_layers.items()}
-    print(name_to_idx)
 
     model.eval()
     extr_act = extract_activations(
@@ -218,8 +217,8 @@ def compute_overlap(
                             subjects=subjects,
                             k=k,
                         )
-                        accelerator.print("overlap", ov_tmp[name][k])
-                        accelerator.print("\n")
+                        #accelerator.print("overlap", ov_tmp[name][k])
+                        #accelerator.print("\n")
 
     overlaps[shots][norm] = ov_tmp
 

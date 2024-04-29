@@ -916,7 +916,7 @@ class measure_statistics:
                 model=model,
                 n_layer=model.config.num_hidden_layers,
                 option="norm1",
-                every=1,
+                every=8,
                 world_size=accelerator.num_processes,
             )
 
@@ -1023,9 +1023,9 @@ class measure_statistics:
             for shot, shot_val in overlaps.items():
                 for norm, norm_val in shot_val.items():
                     for k, k_val in norm_val.items():
-                        logger.info(
-                            f"iter {completed_steps}. overlap with subjects outputs {shot}, {norm}, {k}: {list(overlaps[shot][norm][k].values())[-1]}\n"
-                        )
+                        #logger.info(
+                        #    f"iter {completed_steps}. overlap with subjects outputs {shot}, {norm}, {k}: {list(overlaps[shot][norm][k].values())[-1]}\n"
+                        #)
                         logger.info(
                             f"iter {completed_steps}. overlap outputs {shot}, {norm}, {k}: {np.mean(list(list(overlaps[shot][norm][k].values())[-1].values())):.4f}\n"
                         )
