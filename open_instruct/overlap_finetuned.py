@@ -352,50 +352,6 @@ def main():
         accelerator_log_kwargs["log_with"] = args.report_to
         accelerator_log_kwargs["project_dir"] = args.output_dir
 
-    # os.environ["ACCELERATE_MIXED_PRECISION"] = args.precision
-
-    # # # we use fsdp also when world size ==1. accelerate issue in casting
-    # if int(os.environ["WORLD_SIZE"]) > 1:
-    #     os.environ["ACCELERATE_USE_FSDP"] = "true"
-
-    # #     os.environ["FSDP_SHRDING_STRATEGY"] = "FULL_SHARD"
-    # #     os.environ["FSDP_AUTO_WRAP_POLICY"] = "TRANSFORMER_BASED_WRAP"
-    # #     os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = "LlamaDecoderLayer"
-
-    # #     os.environ["FSDP_BACKWARD_PREFETCH"] = "BACKWARD_PRE"
-    # #     os.environ["FSDP_STATE_DICT_TYPE"] = "SHARDED_STATE_DICT"
-    # #     os.environ["FSDP_OFFLOAD_PARAMS"] = "false"
-
-    # def lambda_fn(module: torch.nn.Module):
-    #     if isinstance(module, LlamaDecoderLayer):
-    #         return True  # like transformer_auto_wrap_policy
-    #     if isinstance(module, torch.nn.Linear) and all(
-    #         p.requires_grad for p in module.parameters()
-    #     ):
-    #         return True  # wrap each trainable linear separately
-    #     return False
-
-    # auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
-
-    # fsdp_plugin = FullyShardedDataParallelPlugin(
-    #     sharding_strategy=ShardingStrategy.FULL_SHARD,
-    #     backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
-    #     mixed_precision_policy=MixedPrecision(
-    #         param_dtype=torch.bfloat16,
-    #         reduce_dtype=torch.bfloat16,
-    #         buffer_dtype=torch.bfloat16,
-    #     ),
-    #     auto_wrap_policy=auto_wrap_policy,
-    #     cpu_offload=False,
-    #     ignored_modules=None,
-    #     limit_all_gathers=True,
-    #     use_orig_params=False,
-    #     param_init_fn=None,
-    #     sync_module_states=True,
-    #     forward_prefetch=False,
-    #     activation_checkpointing=False,
-    # )
-
     accelerator = Accelerator(
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         **accelerator_log_kwargs,
@@ -528,29 +484,21 @@ def main():
     # Prepare everything with `accelerator`.
     #model.load_adapter(args.resume_from_checkpoint)
     model = accelerator.prepare(model)
-    model_name = args.model_name_or_path.split("/")[-1]
 
-    # Potentially load in the weights and states from a previous save
-    #if args.resume_from_checkpoint is not None or args.resume_from_checkpoint != "":
-    #    checkpoint_path = args.resume_from_checkpoint
-    #   #path = os.path.basename(args.resume_from_checkpoint)
-    #else:
-    #    # Get the most recent checkpoint
-    #    dirs = [f.name for f in os.scandir(os.getcwd()) if f.is_dir()]
-    #    dirs.sort(key=os.path.getctime)
-    #    path = dirs[
-    #        -1
-    #    ]  # Sorts folders by date modified, most recent checkpoint is the last
-    #    checkpoint_path = path
-    #    path = os.path.basename(checkpoint_path)
+    # ***********************************************************
 
-    #accelerator.print(f"Resumed from checkpoint: {checkpoint_path}")
-    #accelerator.print(f"Resumed from checkpoint: {path}")
-    #accelerator.load_state(checkpoint_path)
+    target_layers = get_target_layers_llama(
+        model=model,
+        n_layer=model.config.num_hidden_layers,
+        option="norm1",
+        every=8,
+        world_size=accelerator.num_processes,
+    )
 
     filename = ""
     if args.out_filename != "":
         filename = "_" + args.out_filename
+
     stats = defaultdict()
     meter = measure_statistics(
         stats,
@@ -575,25 +523,6 @@ def main():
         do_overlap=args.measure_overlap,
     )
 
-    assert False
-
-    # Potentially load in the weights and states from a previous save
-    if args.resume_from_checkpoint:
-        if args.resume_from_checkpoint is not None or args.resume_from_checkpoint != "":
-            checkpoint_path = args.resume_from_checkpoint
-            path = os.path.basename(args.resume_from_checkpoint)
-        else:
-            # Get the most recent checkpoint
-            dirs = [f.name for f in os.scandir(os.getcwd()) if f.is_dir()]
-            dirs.sort(key=os.path.getctime)
-            path = dirs[
-                -1
-            ]  # Sorts folders by date modified, most recent checkpoint is the last
-            checkpoint_path = path
-            path = os.path.basename(checkpoint_path)
-
-        accelerator.print(f"Resumed from checkpoint: {checkpoint_path}")
-        accelerator.load_state(path)
 
 
 # *****************************************************************************************************************************
