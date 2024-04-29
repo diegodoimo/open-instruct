@@ -63,6 +63,7 @@ from collections import defaultdict
 from dadapy.data import Data
 import pickle
 from overlap_utils.pairwise_distances import compute_distances
+from peft import PeftModel
 
 # *******************************************************************
 
@@ -439,6 +440,33 @@ def main():
         lora_dropout=args.lora_dropout,
         use_flash_attention=False,
     )
+
+    if args.use_lora:
+        from peft import LoraConfig, TaskType, get_peft_model
+
+        if args.resume_from_checkpoint:
+            accelerator.print("loading pretrained peft models")
+            model = PeftModel.from_pretrained(model, args.resume_from_checkpoint)
+        else:
+            accelerator.print("Initializing LORA model...")
+            peft_config = LoraConfig(
+                task_type=TaskType.CAUSAL_LM,
+                inference_mode=False,
+                r=args.lora_rank,
+                lora_alpha=args.lora_alpha,
+                lora_dropout=args.lora_dropout,
+                target_modules=[
+                    "q_proj",
+                    "o_proj",
+                    "v_proj",
+                    "k_proj",
+                    "gate_proj",
+                    "up_proj",
+                    "down_proj",
+                ],
+            )
+            model = get_peft_model(model, peft_config)
+        model.print_trainable_parameters()
 
     tokenizer = get_tokenizer(
         tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
