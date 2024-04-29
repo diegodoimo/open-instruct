@@ -526,7 +526,7 @@ def main():
     # ************************************************************************
 
     # Prepare everything with `accelerator`.
-    model.load_adapter(args.resume_from_checkpoint)
+    #model.load_adapter(args.resume_from_checkpoint)
     model = accelerator.prepare(model)
     model_name = args.model_name_or_path.split("/")[-1]
 
