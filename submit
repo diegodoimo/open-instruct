@@ -22,7 +22,7 @@ NUM_GPUS=1
 TOTAL_BATCH_SIZE=16
 BATCH_SIZE_PER_GPU=1
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
-model_name='llama-2-7b'
+model_name='llama-3-8b'
 
 
 # Lora training
@@ -34,12 +34,12 @@ accelerate launch \
     --num_processes $NUM_GPUS \
     --dynamo_backend 'no' \
    open_instruct/finetune.py \
-    --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v2/models_hf/$model_name \
+    --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v3/models_hf/$model_name \
     --use_lora \
     --lora_rank 64 \
     --lora_alpha 16 \
     --lora_dropout 0.1 \
-    --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v2/models_hf/$model_name \
+    --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v3/models_hf/$model_name \
     --use_slow_tokenizer \
     --train_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/processed/dolly/dolly_data.jsonl \
     --val_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/eval/mmlu \
@@ -57,10 +57,10 @@ accelerate launch \
     --weight_decay 0. \
     --num_train_epochs 2 \
     --output_dir ./results/${model_name}/ \
-    --logging_steps 10 \
-    --eval_steps 10 \
+    --logging_steps 20 \
+    --eval_steps 20 \
     --measure_baselines \
-    --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/llama-2-7b" \
+    --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/llama-3-8b" \
     --out_filename "" \
 #--learning_rate 1e-4 \
     #--with_tracking \
