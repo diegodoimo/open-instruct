@@ -62,6 +62,7 @@ accelerate launch \
     --measure_baselines \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
     --out_filename "" \
+    --train_on_dev
 #--learning_rate 1e-4 \
     #--with_tracking \
     #--report_to tensorboard \

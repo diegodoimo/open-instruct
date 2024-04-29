@@ -332,6 +332,12 @@ def parse_args():
         action="store_true",
         help="",
     )
+    parser.add_argument(
+        "--train_on_dev",
+        action="store_true",
+        help="",
+    )
+
     parser.add_argument("--overlap_base_dir", type=str, default=None, help="")
 
     args = parser.parse_args()
@@ -428,7 +434,12 @@ def main():
     if args.seed is not None:
         set_seed(args.seed)
 
-    if accelerator.is_main_process and args.output_dir is not None:
+    if accelerator.is_main_process:
+        if args.train_on_dev:
+            args.output_dir += "/dev"
+        else:
+            args.output_dir += "/dev_val"
+        args.output_dir += f"/{args.num_train_epochs}"
         os.makedirs(args.output_dir, exist_ok=True)
 
     accelerator.wait_for_everyone()
@@ -527,6 +538,7 @@ def main():
         subject=None,
         num_processes=args.preprocessing_num_workers,
         split="train",
+        train_on_dev=args.train_on_dev,
     ).construct_dataset()
 
     val_dataset, longest_seq = MMLU_Dataset(

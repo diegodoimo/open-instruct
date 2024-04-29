@@ -486,6 +486,7 @@ class MMLU_Dataset:
         num_processes=1,
         num_samples=None,
         split="test",
+        train_on_dev=False,
     ):
 
         self.dataset = "mmlu"
@@ -502,6 +503,7 @@ class MMLU_Dataset:
         self.num_samples = num_samples
         self.accelerator = accelerator
         self.split = split
+        self.train_on_dev = train_on_dev
 
     def format_subject(self, subject):
         l = subject.split("_")
@@ -673,7 +675,10 @@ class MMLU_Dataset:
         split = self.split
         if self.split == "train":
             # training on the dev + validation datasets
-            split = "dev"
+            if self.train_on_dev:
+                split = "dev"
+            else:
+                split = "dev+validation"
             assert self.num_few_shots == 0
 
         if self.num_samples is not None:
