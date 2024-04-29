@@ -436,13 +436,6 @@ def main():
     # *******************************************************
     # # Load pretrained model and tokenizer
 
-    # model = get_model_no_lora(
-    #     model_name_or_path=args.model_name_or_path,
-    #     precision=torch.bfloat16,
-    #     low_cpu_mem_usage=args.low_cpu_mem_usage,
-    #     accelerator=accelerator,
-    # )
-
     model = get_model_hf(
         accelerator=accelerator,
         model_name_or_path=args.model_name_or_path,
@@ -465,46 +458,7 @@ def main():
         max_seq_len = args.max_seq_length
     accelerator.print(max_seq_len)
 
-    # ****************************************************************************
-    # # Preprocessing the datasets.
-
-    # train_dataset = get_dataset_open_instruct_new(
-    #     accelerator=accelerator,
-    #     filepath=args.train_file,
-    #     tokenizer=tokenizer,
-    #     max_seq_length=2048,
-    #     num_processes=1,
-    # )
-
-    # val_dataset = get_mmlu_open_instruct(
-    #     filepath=args.test_file,
-    #     tokenizer=tokenizer,
-    #     data_fold="val",
-    #     max_seq_length=args.max_seq_length,
-    #     num_processes=6,
-    #     num_samples=None,
-    #     subjects=None,
-    # )
-
-    # test_dataset = get_mmlu_open_instruct(
-    #     filepath=args.test_file,
-    #     tokenizer=tokenizer,
-    #     data_fold="test",
-    #     max_seq_length=args.max_seq_length,
-    #     num_processes=6,
-    #     num_samples=None,
-    #     subjects=None,
-    # )
-
-    train_dataset, longest_seq = MMLU_Dataset(
-        tokenizer=tokenizer,
-        max_seq_len=args.max_seq_length,
-        num_few_shots=0,
-        accelerator=accelerator,
-        subject=None,
-        num_processes=args.preprocessing_num_workers,
-        split="train",
-    ).construct_dataset()
+    # ******************************************************************************************
 
     val_dataset, longest_seq = MMLU_Dataset(
         tokenizer=tokenizer,
@@ -531,17 +485,6 @@ def main():
     assert args.per_device_train_batch_size == 1
     assert args.per_device_eval_batch_size == 1
 
-    # # DataLoaders creation:
-    train_loader, train_sampler = get_dataloader(
-        train_dataset,
-        args.per_device_train_batch_size,
-        tokenizer.pad_token_id,
-        world_size=world_size,
-        shuffle=True,
-        num_processes=6,
-        return_sampler=True,
-    )
-
     val_loader = get_dataloader(
         val_dataset,
         args.per_device_eval_batch_size,
@@ -561,85 +504,38 @@ def main():
             num_processes=6,
         )
 
-    # *******************************************************************************
-
-    gradient_accumulation_iters = max(
-        1, int(args.batch_size / args.per_device_train_batch_size / world_size)
-    )
-    optimizer = get_optimizer(
-        model=model,
-        learning_rate=args.learning_rate,
-        weight_decay=args.weight_decay,
-    )
-
-    lr_scheduler = get_scheduler(
-        args.lr_scheduler_type,
-        optimizer,
-        epochs=args.num_train_epochs,
-        num_iters=len(train_loader),
-        warmup_steps=args.warmup_steps,
-        warmup_ratio=args.warmup_ratio,
-        gradient_accumulation_iters=gradient_accumulation_iters,
-    )
-
     # ************************************************************************
 
     # Prepare everything with `accelerator`.
     model = accelerator.prepare(model)
-    optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        optimizer, train_loader, lr_scheduler
+    model_name = args.model_name_or_path.split("/")[-1]
+
+    filename = ""
+    if args.out_filename != "":
+        filename = "_" + args.out_filename
+    stats = defaultdict()
+    meter = measure_statistics(
+        stats,
+        model,
+        val_loader,
+        test_loader,
+        tokenizer,
+        accelerator,
+        ckpt_dir=args.overlap_base_dir + f"/{model_name}",
+        results_dir=args.output_dir,
+        prepare_for_overlap=args.measure_overlap,
+        filename=f"{filename}epoch{args.num_train_epochs}",
     )
 
-    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(
-        len(train_dataloader) / args.gradient_accumulation_steps
+    meter.update(
+        accelerator=accelerator,
+        model=model,
+        completed_steps=0,
+        epoch=0,
+        do_overlap=args.measure_overlap,
     )
 
-    args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
-
-    # Afterwards we recalculate our number of training epochs
-    args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
-
-    # Figure out how many steps we should save the Accelerator states
-    checkpointing_steps = args.checkpointing_steps
-    if checkpointing_steps is not None and checkpointing_steps.isdigit():
-        checkpointing_steps = int(checkpointing_steps)
-
-    # We need to initialize the trackers we use, and also store our configuration.
-    # The trackers initializes automatically on the main process.
-    if args.with_tracking:
-        experiment_config = vars(args)
-        # TensorBoard cannot log Enums, need the raw value
-        experiment_config["lr_scheduler_type"] = experiment_config[
-            "lr_scheduler_type"
-        ].value
-        accelerator.init_trackers("open_instruct", experiment_config)
-
-    # Train!
-    total_batch_size = (
-        args.per_device_train_batch_size
-        * accelerator.num_processes
-        * args.gradient_accumulation_steps
-    )
-
-    logger.info("***** Running training *****")
-    logger.info(f"  Num examples = {len(train_dataset)}")
-    logger.info(f"  Num Epochs = {args.num_train_epochs}")
-    logger.info(
-        f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
-    )
-    logger.info(
-        f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
-    )
-    logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
-    logger.info(f"  Total optimization steps = {args.max_train_steps}")
-
-    # Only show the progress bar once on each machine.
-    # progress_bar = tqdm(
-    #    range(args.max_train_steps), disable=not accelerator.is_local_main_process
-    # )
-    completed_steps = 0
-    starting_epoch = 0
+    assert False
 
     # Potentially load in the weights and states from a previous save
     if args.resume_from_checkpoint:
@@ -658,165 +554,9 @@ def main():
 
         accelerator.print(f"Resumed from checkpoint: {checkpoint_path}")
         accelerator.load_state(path)
-        # Extract `epoch_{i}` or `step_{i}`
-        training_difference = os.path.splitext(path)[0]
 
-        if "epoch" in training_difference:
-            starting_epoch = int(training_difference.replace("epoch_", "")) + 1
-            resume_step = None
-            completed_steps = starting_epoch * num_update_steps_per_epoch
-        else:
-            # need to multiply `gradient_accumulation_steps` to reflect real steps
-            resume_step = (
-                int(training_difference.replace("step_", ""))
-                * args.gradient_accumulation_steps
-            )
-            starting_epoch = resume_step // len(train_dataloader)
-            completed_steps = resume_step // args.gradient_accumulation_steps
-            resume_step -= starting_epoch * len(train_dataloader)
 
-    # update the progress_bar if load from checkpoint
-    # progress_bar.update(completed_steps)
-
-    filename = ""
-    if args.out_filename != "":
-        filename = "_" + args.out_filename
-
-    stats = defaultdict()
-    stats["num_epochs"] = args.num_train_epochs
-    stats["lr"] = args.learning_rate
-    stats["scheduler"] = args.lr_scheduler_type
-    stats["batch_size"] = args.batch_size
-
-    meter = measure_statistics(
-        stats,
-        model,
-        val_loader,
-        test_loader,
-        tokenizer,
-        accelerator,
-        ckpt_dir=args.overlap_base_dir,
-        results_dir=args.output_dir,
-        prepare_for_overlap=args.measure_overlap,
-        filename=f"{filename}epoch{args.num_train_epochs}",
-    )
-
-    if args.measure_baselines:
-        meter.update(
-            accelerator=accelerator,
-            model=model,
-            completed_steps=0,
-            epoch=0,
-            do_overlap=args.measure_overlap,
-        )
-
-    accelerator.print("start training")
-    print_memory_consumed()
-    accelerator.print("before train run")
-    sys.stdout.flush()
-
-    for epoch in range(starting_epoch, args.num_train_epochs):
-        meter.update(
-            accelerator=accelerator,
-            model=model,
-            completed_steps=0,
-            epoch=0,
-            do_overlap=args.measure_overlap,
-            do_val=True,
-        )
-
-        model.train()
-        total_loss = 0
-        if (
-            args.resume_from_checkpoint
-            and epoch == starting_epoch
-            and resume_step is not None
-        ):
-            # We skip the first `n` batches in the dataloader when resuming from a checkpoint
-            active_dataloader = accelerator.skip_first_batches(
-                train_dataloader, resume_step
-            )
-        else:
-            active_dataloader = train_dataloader
-
-        start = time.time()
-        for step, batch in enumerate(active_dataloader):
-            with accelerator.accumulate(model):
-
-                outputs = model(**batch, use_cache=False)
-                loss = outputs.loss
-                # We keep track of the loss at each logged step
-                total_loss += loss.detach().float()
-                accelerator.backward(loss)
-                # clip gradient norm. don't do this with deepspeed
-                if accelerator.sync_gradients and args.clip_grad_norm > 0:
-                    accelerator.clip_grad_norm_(model.parameters(), args.clip_grad_norm)
-                optimizer.step()
-                optimizer.zero_grad()
-                lr_scheduler.step()
-
-            # Checks if the accelerator has performed an optimization step behind the scenes
-            if accelerator.sync_gradients:
-                # progress_bar.update(1)
-                completed_steps += 1
-                if args.logging_steps and completed_steps % args.logging_steps == 0:
-                    t_tot = time.time() - start
-
-                    avg_loss = (
-                        accelerator.gather(total_loss).mean().item()
-                        / args.gradient_accumulation_steps
-                        / args.logging_steps
-                    )
-                    logger.info(
-                        f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
-                    )
-                    total_loss = 0
-
-                if completed_steps % args.eval_steps == 0:
-
-                    meter.update(
-                        accelerator=accelerator,
-                        model=model,
-                        completed_steps=completed_steps,
-                        epoch=epoch,
-                        do_val=True,
-                        do_overlap=args.measure_overlap,
-                    )
-
-                if isinstance(checkpointing_steps, int):
-                    if completed_steps % checkpointing_steps == 0:
-                        output_dir = f"step_{completed_steps}"
-                        if args.output_dir is not None:
-                            output_dir = os.path.join(args.output_dir, output_dir)
-                        save_with_accelerate(accelerator, model, output_dir, args)
-
-                if completed_steps >= args.max_train_steps:
-                    break
-
-        meter.update(
-            accelerator=accelerator,
-            model=model,
-            completed_steps=completed_steps,
-            epoch=epoch,
-            do_test=True,
-            do_overlap=args.measure_overlap,
-        )
-        print_memory_consumed()
-
-        # save model
-        output_dir = f"epoch_{epoch}"
-        if args.output_dir is not None:
-            output_dir = os.path.join(args.output_dir, output_dir)
-        save_with_accelerate(accelerator, model, output_dir, args)
-
-    if args.with_tracking:
-        accelerator.end_training()
-
-    # if args.output_dir is not None:
-    #     accelerator.wait_for_everyone()
-    #     if accelerator.is_main_process:
-    #         tokenizer.save_pretrained(args.output_dir)
-    #     save_with_accelerate(accelerator, model, args.output_dir, args)
+# *****************************************************************************************************************************
 
 
 # FSDP has issues with `inference_mode`
@@ -921,7 +661,7 @@ class measure_statistics:
 
             accelerator.print("preparing for overlap")
             sys.stdout.flush()
-            for shots in ["0shot", "5shot"]:
+            for shots in ["0shot"]:
                 layer_indices = defaultdict()
                 for index, name in target_layers.items():
                     if index < 1:
