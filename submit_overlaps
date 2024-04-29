@@ -33,7 +33,7 @@ accelerate launch \
     --num_machines 1 \
     --num_processes $NUM_GPUS \
     --dynamo_backend 'no' \
-   open_instruct/finetune.py \
+   open_instruct/overlap_finetunes.py \
     --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v2/models_hf/$model_name \
     --use_lora \
     --lora_rank 64 \
@@ -41,7 +41,6 @@ accelerate launch \
     --lora_dropout 0.1 \
     --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/llama/llama_v2/models_hf/$model_name \
     --use_slow_tokenizer \
-    --train_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/processed/dolly/dolly_data.jsonl \
     --val_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/eval/mmlu \
     --test_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/eval/mmlu \
     --max_seq_length 1024 \
@@ -50,16 +49,9 @@ accelerate launch \
     --checkpointing_steps epoch \
     --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 1 \
-    --gradient_accumulation_steps $GRADIENT_ACC_STEPS \
-    --learning_rate 2e-4 \
-    --lr_scheduler_type linear \
-    --warmup_ratio 0.03 \
-    --weight_decay 0. \
-    --num_train_epochs 2 \
-    --output_dir ./results/${model_name}/ \
-    --logging_steps 10 \
-    --eval_steps 10 \
     --measure_baselines \
-    --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation" \
+    --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
+    --ckpt_dir "/u/area/ddoimo/ddoimo/finetuning_llm/open-instruct/results/$model_name/epoch_0" \
+    --output_dir ./results/${model_name}/ \
     --out_filename "" \
 

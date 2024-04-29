@@ -510,6 +510,23 @@ def main():
     model = accelerator.prepare(model)
     model_name = args.model_name_or_path.split("/")[-1]
 
+    # Potentially load in the weights and states from a previous save
+    if args.resume_from_checkpoint is not None or args.resume_from_checkpoint != "":
+        checkpoint_path = args.resume_from_checkpoint
+        path = os.path.basename(args.resume_from_checkpoint)
+    else:
+        # Get the most recent checkpoint
+        dirs = [f.name for f in os.scandir(os.getcwd()) if f.is_dir()]
+        dirs.sort(key=os.path.getctime)
+        path = dirs[
+            -1
+        ]  # Sorts folders by date modified, most recent checkpoint is the last
+        checkpoint_path = path
+        path = os.path.basename(checkpoint_path)
+
+    accelerator.print(f"Resumed from checkpoint: {checkpoint_path}")
+    accelerator.load_state(path)
+
     filename = ""
     if args.out_filename != "":
         filename = "_" + args.out_filename
@@ -521,7 +538,7 @@ def main():
         test_loader,
         tokenizer,
         accelerator,
-        ckpt_dir=args.overlap_base_dir + f"/{model_name}",
+        ckpt_dir=args.overlap_base_dir,
         results_dir=args.output_dir,
         prepare_for_overlap=args.measure_overlap,
         filename=f"{filename}epoch{args.num_train_epochs}",
@@ -532,6 +549,8 @@ def main():
         model=model,
         completed_steps=0,
         epoch=0,
+        do_test=True,
+        do_val=True,
         do_overlap=args.measure_overlap,
     )
 
@@ -661,7 +680,7 @@ class measure_statistics:
 
             accelerator.print("preparing for overlap")
             sys.stdout.flush()
-            for shots in ["0shot"]:
+            for shots in ["0shot", "5shots"]:
                 layer_indices = defaultdict()
                 for index, name in target_layers.items():
                     if index < 1:
