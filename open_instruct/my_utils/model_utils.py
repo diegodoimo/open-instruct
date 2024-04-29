@@ -63,27 +63,6 @@ def get_model_hf(
         accelerator.print("Training new model from scratch")
         model = AutoModelForCausalLM.from_config(config)
 
-    if use_lora:
-
-        accelerator.print("Initializing LORA model...")
-        peft_config = LoraConfig(
-            task_type=TaskType.CAUSAL_LM,
-            inference_mode=False,
-            r=lora_rank,
-            lora_alpha=lora_alpha,
-            lora_dropout=lora_dropout,
-            target_modules=[
-                "q_proj",
-                "o_proj",
-                "v_proj",
-                "k_proj",
-                "gate_proj",
-                "up_proj",
-                "down_proj",
-            ],
-        )
-        model = get_peft_model(model, peft_config)
-        model.print_trainable_parameters()
     return model
 
 
