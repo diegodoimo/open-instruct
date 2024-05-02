@@ -711,7 +711,6 @@ class MMLU_Dataset:
         Construct the request instances for the scenario
         """
         # removed trust remote code
-        self.accelerator.print("loading dataset")
 
         split = self.split
         if self.split == "train":
@@ -722,11 +721,18 @@ class MMLU_Dataset:
                 split = "dev+validation"
             assert self.num_few_shots == 0
 
+        self.accelerator.print(
+            f"loading dataset\nsplit: {self.split}\nmode: {split}\nbalance: {self.balance_dataset}"
+        )
+
         if self.num_samples is not None:
             split = f"test[:{self.num_samples}]"
+
         if self.subject is not None:
             dataset = load_dataset("cais/mmlu", self.subject, split=split)
-        elif self.split == "train" and split == "dev+val" and self.balance_dataset:
+        elif (
+            self.split == "train" and split == "dev+validation" and self.balance_dataset
+        ):
             dataset = self.construct_dev_val_balanced(samples_per_subject=15)
         else:
             dataset = load_dataset("cais/mmlu", "all", split=split)

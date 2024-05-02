@@ -547,6 +547,7 @@ def main():
         train_on_dev=args.train_on_dev,
         balance_dataset=args.balance_dataset,
     ).construct_dataset()
+    accelerator.print(f"num_samples = {len(train_dataset)}")
 
     val_dataset, longest_seq = MMLU_Dataset(
         tokenizer=tokenizer,
