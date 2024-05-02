@@ -14,7 +14,7 @@ from datasets.utils.logging import disable_progress_bar
 import sys
 
 import numpy as np
-from datasets import load_dataset
+from datasets import load_dataset, concatenate_datasets
 
 disable_progress_bar()
 
@@ -487,6 +487,7 @@ class MMLU_Dataset:
         num_samples=None,
         split="test",
         train_on_dev=False,
+        balance_dataset=False,
     ):
 
         self.dataset = "mmlu"
@@ -504,6 +505,7 @@ class MMLU_Dataset:
         self.accelerator = accelerator
         self.split = split
         self.train_on_dev = train_on_dev
+        self.balance_dataset = balance_dataset
 
     def format_subject(self, subject):
         l = subject.split("_")
@@ -665,6 +667,45 @@ class MMLU_Dataset:
             "attention_mask": attention_mask,
         }
 
+    def construct_dev_val_balanced(self, samples_per_subject):
+        # here we construct the training set as the union of dev+val"
+        # since the val is deeply unbalance we here from 8 to 200 with a median of 30"
+        # here we select sampels per subject to make it more balanced
+
+        dataset = load_dataset("cais/mmlu", "all", split="validation")
+        subjects = np.unique(dataset["subject"])
+
+        # get
+        for i, subject in enumerate(subjects):
+            tmp_data = dataset.filter(lambda example: example["subject"] == subject)
+            num_samples = len(tmp_data)
+            to_select = np.arange(num_samples)
+            if num_samples > 15:
+                to_select = np.random.choice(
+                    num_samples, size=samples_per_subject, replace=False
+                )
+                to_select = np.sort(to_select)
+            final_tmp = tmp_data.select(list(to_select))
+            assert len(final_tmp) <= samples_per_subject
+            if i == 0:
+                final = final_tmp
+            else:
+                final = concatenate_datasets([final, final_tmp])
+
+        dataset = load_dataset("cais/mmlu", "all", split="dev")
+        for i, subject in enumerate(subjects):
+            tmp_data = dataset.filter(lambda example: example["subject"] == subject)
+            assert len(tmp_data) == 5
+            final = concatenate_datasets([final, tmp_data])
+
+        # just double checks
+        for i, subject in enumerate(subjects):
+            tmp_data = final.filter(lambda example: example["subject"] == subject)
+            assert len(tmp_data) <= 5 + samples_per_subject
+            assert len(tmp_data) >= 13, (subject, len(tmp_data))
+
+        return final
+
     def construct_dataset(self):
         """
         Construct the request instances for the scenario
@@ -685,6 +726,8 @@ class MMLU_Dataset:
             split = f"test[:{self.num_samples}]"
         if self.subject is not None:
             dataset = load_dataset("cais/mmlu", self.subject, split=split)
+        elif self.split == "train" and split == "dev+val" and self.balance_dataset:
+            dataset = self.construct_dev_val_balanced(samples_per_subject=15)
         else:
             dataset = load_dataset("cais/mmlu", "all", split=split)
 

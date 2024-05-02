@@ -337,7 +337,11 @@ def parse_args():
         action="store_true",
         help="",
     )
-
+    parser.add_argument(
+        "--balance_dataset",
+        action="store_true",
+        help="",
+    )
     parser.add_argument("--overlap_base_dir", type=str, default=None, help="")
 
     args = parser.parse_args()
@@ -437,6 +441,8 @@ def main():
     if accelerator.is_main_process:
         if args.train_on_dev:
             args.output_dir += "/dev"
+        elif args.balance_dataset:
+            args.output_dir += "/dev_val_balanced"
         else:
             args.output_dir += "/dev_val"
         args.output_dir += f"/{args.num_train_epochs}"
@@ -539,6 +545,7 @@ def main():
         num_processes=args.preprocessing_num_workers,
         split="train",
         train_on_dev=args.train_on_dev,
+        balance_dataset=args.balance_dataset,
     ).construct_dataset()
 
     val_dataset, longest_seq = MMLU_Dataset(
