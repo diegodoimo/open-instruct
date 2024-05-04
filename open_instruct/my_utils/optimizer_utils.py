@@ -59,6 +59,8 @@ def get_scheduler(
     warmup_ratio=None,
     gradient_accumulation_iters=1,
 ):
+    assert warmup_ratio is None or warmup_steps is None
+
     # Scheduler and math around the number of training steps.
     num_update_steps_per_epoch = math.ceil(num_iters / gradient_accumulation_iters)
     num_training_steps_for_scheduler = epochs * num_update_steps_per_epoch

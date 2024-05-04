@@ -723,6 +723,7 @@ def main():
             completed_steps=0,
             epoch=0,
             do_overlap=args.measure_overlap,
+            do_val=True,
         )
 
     accelerator.print("start training")
@@ -739,14 +740,6 @@ def main():
     # *******************************************************************************
 
     for epoch in range(starting_epoch, args.num_train_epochs):
-        meter.update(
-            accelerator=accelerator,
-            model=model,
-            completed_steps=0,
-            epoch=0,
-            do_overlap=args.measure_overlap,
-            do_val=True,
-        )
 
         model.train()
         total_loss = 0
@@ -826,12 +819,6 @@ def main():
 
     if args.with_tracking:
         accelerator.end_training()
-
-    # if args.output_dir is not None:
-    #     accelerator.wait_for_everyone()
-    #     if accelerator.is_main_process:
-    #         tokenizer.save_pretrained(args.output_dir)
-    #     save_with_accelerate(accelerator, model, args.output_dir, args)
 
 
 # FSDP has issues with `inference_mode`
