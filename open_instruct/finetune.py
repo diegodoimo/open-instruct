@@ -618,7 +618,7 @@ def main():
         weight_decay=args.weight_decay,
     )
 
-    lr_scheduler = get_scheduler(
+    lr_scheduler, warmup_steps = get_scheduler(
         args.lr_scheduler_type,
         optimizer,
         epochs=args.num_train_epochs,
@@ -731,12 +731,24 @@ def main():
 
     steps_to_save = 20
     eval_steps = np.unique(
-        np.logspace(0, np.log10(args.max_train_steps), steps_to_save, dtype=int)
+        np.around(
+            np.logspace(
+                0,
+                np.log10(args.max_train_steps),
+                steps_to_save,
+            )
+        ).astype(int)
     )
 
     checkpoints_to_save = 10
     checkpointing_steps = np.unique(
-        np.logspace(0, np.log10(args.max_train_steps), checkpoints_to_save, dtype=int)
+        np.around(
+            np.logspace(
+                0,
+                np.log10(args.max_train_steps),
+                checkpoints_to_save,
+            )
+        ).astype(int)
     )
 
     # *******************************************************************************

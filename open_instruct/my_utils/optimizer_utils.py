@@ -60,6 +60,7 @@ def get_scheduler(
     gradient_accumulation_iters=1,
 ):
     assert warmup_ratio is None or warmup_steps is None
+    assert lr_scheduler_type in ["linear", "cosine"]
 
     # Scheduler and math around the number of training steps.
     num_update_steps_per_epoch = math.ceil(num_iters / gradient_accumulation_iters)
@@ -76,4 +77,14 @@ def get_scheduler(
         num_training_steps=num_training_steps_for_scheduler,
         num_warmup_steps=warmup_steps,
     )
-    return scheduler
+    return scheduler, warmup_steps
+
+    # LINEAR = "linear"
+    # COSINE = "cosine"
+    # COSINE_WITH_RESTARTS = "cosine_with_restarts"
+    # POLYNOMIAL = "polynomial"
+    # CONSTANT = "constant"
+    # CONSTANT_WITH_WARMUP = "constant_with_warmup"
+    # INVERSE_SQRT = "inverse_sqrt"
+    # REDUCE_ON_PLATEAU = "reduce_lr_on_plateau"
+    # COSINE_WITH_MIN_LR = "cosine_with_min_lr"
