@@ -15,6 +15,10 @@ import sys
 
 import numpy as np
 from datasets import load_dataset, concatenate_datasets
+from collections import Counter
+
+
+rng = np.random.default_rng(42)
 
 disable_progress_bar()
 
@@ -487,15 +491,15 @@ class MMLU_Dataset:
         num_samples=None,
         split="test",
         train_on_dev=False,
-        balance_dataset=False,
+        train_on_test=False,
+        mask_path=None,
+        samples_per_subject=None,
     ):
 
         self.dataset = "mmlu"
         self.subject = subject
         if subject is not None:
             self.dataset = f"mmlu:{self.subject}"
-        # we add space because the prompt format ends with ":" without a space.
-        # comparing the answers in the token space requires this construction.
         self.answers = np.array(["A", "B", "C", "D"])
         self.num_few_shots = num_few_shots
         self.tokenizer = tokenizer
@@ -505,7 +509,9 @@ class MMLU_Dataset:
         self.accelerator = accelerator
         self.split = split
         self.train_on_dev = train_on_dev
-        self.balance_dataset = balance_dataset
+        self.train_on_test = train_on_test
+        self.mask_path = mask_path
+        self.samples_per_subject = samples_per_subject
 
     def format_subject(self, subject):
         l = subject.split("_")
@@ -667,42 +673,32 @@ class MMLU_Dataset:
             "attention_mask": attention_mask,
         }
 
-    def construct_dev_val_balanced(self, samples_per_subject):
-        # here we construct the training set as the union of dev+val"
-        # since the val is deeply unbalance we here from 8 to 200 with a median of 30"
-        # here we select sampels per subject to make it more balanced
+    def construct_balanced(self, samples_per_subject, split, mask_path):
+        assert samples_per_subject is not None or mask_path is not None
 
-        dataset = load_dataset("cais/mmlu", "all", split="validation")
+        dataset = load_dataset("cais/mmlu", "all", split=split)
         subjects = np.unique(dataset["subject"])
 
-        # get
-        for i, subject in enumerate(subjects):
-            tmp_data = dataset.filter(lambda example: example["subject"] == subject)
-            num_samples = len(tmp_data)
-            to_select = np.arange(num_samples)
-            if num_samples > 15:
-                to_select = np.random.choice(
-                    num_samples, size=samples_per_subject, replace=False
-                )
-                to_select = np.sort(to_select)
-            final_tmp = tmp_data.select(list(to_select))
-            assert len(final_tmp) <= samples_per_subject
-            if i == 0:
-                final = final_tmp
-            else:
-                final = concatenate_datasets([final, final_tmp])
+        if self.mask_path is not None:
+            mask = np.load(self.mask_path)
+            final = dataset.select(mask)
+            frequences = Counter(final["subject"]).values()
 
-        dataset = load_dataset("cais/mmlu", "all", split="dev")
-        for i, subject in enumerate(subjects):
-            tmp_data = dataset.filter(lambda example: example["subject"] == subject)
-            assert len(tmp_data) == 5
-            final = concatenate_datasets([final, tmp_data])
+            if self.split == "test":
+                assert len(np.unique(list(frequences))) == 1
+                assert np.unique(list(frequences))[0] == 100
+                assert mask.shape[0] == 5700
 
-        # just double checks
-        for i, subject in enumerate(subjects):
-            tmp_data = final.filter(lambda example: example["subject"] == subject)
-            assert len(tmp_data) <= 5 + samples_per_subject
-            assert len(tmp_data) >= 13, (subject, len(tmp_data))
+        else:
+            mask = []
+            for sub in np.unique(subjects):
+                ind = np.nonzero(sub == subjects)[0]
+                nsamples = min(samples_per_subject, len(ind))
+                chosen = rng.choice(ind, nsamples, replace=False)
+                mask.extend(list(np.sort(chosen)))
+
+            mask = np.array(mask)
+            final = dataset.select(mask)
 
         return final
 
@@ -717,23 +713,25 @@ class MMLU_Dataset:
             # training on the dev + validation datasets
             if self.train_on_dev:
                 split = "dev"
+            elif self.train_on_test:
+                split = "test"
             else:
                 split = "dev+validation"
             assert self.num_few_shots == 0
 
-        self.accelerator.print(
-            f"loading dataset\nsplit: {self.split}\nmode: {split}\nbalance: {self.balance_dataset}"
-        )
+        self.accelerator.print(f"loading dataset\nsplit: {self.split}\nmode: {split}")
 
         if self.num_samples is not None:
             split = f"test[:{self.num_samples}]"
 
         if self.subject is not None:
             dataset = load_dataset("cais/mmlu", self.subject, split=split)
-        elif (
-            self.split == "train" and split == "dev+validation" and self.balance_dataset
-        ):
-            dataset = self.construct_dev_val_balanced(samples_per_subject=15)
+        elif self.split == "train" and split != "dev":
+            dataset = self.construct_balanced(
+                mask_path=self.mask_path,
+                samples_per_subject=self.samples_per_subject,
+                split=split,
+            )
         else:
             dataset = load_dataset("cais/mmlu", "all", split=split)
 
