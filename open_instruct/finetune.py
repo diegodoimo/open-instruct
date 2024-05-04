@@ -762,7 +762,7 @@ def main():
             if accelerator.sync_gradients:
                 # progress_bar.update(1)
                 completed_steps += 1
-                if args.logging_steps and completed_steps % args.eval_steps == 0:
+                if completed_steps % args.eval_steps == 0:
                     t_tot = time.time() - start
 
                     avg_loss = (
@@ -774,7 +774,6 @@ def main():
                         f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
                     )
                     total_loss = 0
-
                     # if completed_steps % args.eval_steps == 0:
 
                     meter.update(
