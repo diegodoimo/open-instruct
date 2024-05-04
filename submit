@@ -55,13 +55,13 @@ accelerate launch \
     --lr_scheduler_type linear \
     --warmup_ratio 0.03 \
     --weight_decay 0. \
-    --num_train_epochs 10 \
+    --num_train_epochs 4 \
     --output_dir ./results/${model_name}/ \
-    --logging_steps 20 \
     --eval_steps 20 \
     --measure_baselines \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
-    --balance_dataset \
+    --train_on_test \
+    --mask_path "open_instruct/my_utils/test_mask_100.npy"   \
     --out_filename "" 
 
 #--learning_rate 1e-4 \
