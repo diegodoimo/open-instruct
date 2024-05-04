@@ -462,10 +462,10 @@ def get_mmlu_open_instruct(
 def filter_out_long_sequences(tokenized_dataset, max_seq_len):
 
     tot_examples = tokenized_dataset.num_rows
-    tokenized_datasets = tokenized_dataset.filter(
+    tokenized_dataset = tokenized_dataset.filter(
         lambda example: len(example["input_ids"]) < max_seq_len
     )
-    tot_filtered_examples = tokenized_datasets.num_rows
+    tot_filtered_examples = tokenized_dataset.num_rows
 
     if tot_filtered_examples < tot_examples:
         diff = tot_examples - tot_filtered_examples
@@ -719,7 +719,7 @@ class MMLU_Dataset:
                 split = "dev+validation"
             assert self.num_few_shots == 0
 
-        self.accelerator.print(f"loading dataset\nsplit: {self.split}\nmode: {split}")
+        self.accelerator.print(f"loading dataset\nsplit: {self.split}\nmode: {split}\n")
 
         if self.num_samples is not None:
             split = f"test[:{self.num_samples}]"

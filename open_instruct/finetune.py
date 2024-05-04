@@ -503,7 +503,9 @@ def main():
     max_seq_len = model.config.max_position_embeddings
     if args.max_seq_length is not None:
         max_seq_len = args.max_seq_length
-    accelerator.print(max_seq_len)
+        if args.model_name_or_path.endswith("llama-2-13b"):
+            max_seq_len = 768
+    accelerator.print("max_seq_len: ", max_seq_len)
 
     # ****************************************************************************
     # # Preprocessing the datasets.
@@ -538,7 +540,7 @@ def main():
 
     train_dataset, longest_seq = MMLU_Dataset(
         tokenizer=tokenizer,
-        max_seq_len=args.max_seq_length,
+        max_seq_len=max_seq_len,
         num_few_shots=0,
         accelerator=accelerator,
         subject=None,
@@ -552,7 +554,7 @@ def main():
 
     val_dataset, longest_seq = MMLU_Dataset(
         tokenizer=tokenizer,
-        max_seq_len=args.max_seq_length,
+        max_seq_len=1024,
         num_few_shots=0,
         accelerator=accelerator,
         subject=None,
@@ -562,7 +564,7 @@ def main():
 
     test_dataset, longest_seq = MMLU_Dataset(
         tokenizer=tokenizer,
-        max_seq_len=args.max_seq_length,
+        max_seq_len=1024,
         num_few_shots=0,
         accelerator=accelerator,
         subject=None,
@@ -728,8 +730,12 @@ def main():
     accelerator.print("before train run")
     sys.stdout.flush()
 
-    eval_steps = np.logspace(0, np.log10(args.max_train_steps), 50, dtype=int)
-    checkpointing_steps = np.logspace(0, np.log10(args.max_train_steps), 10, dtype=int)
+    eval_steps = np.unique(
+        np.logspace(0, np.log10(args.max_train_steps), 20, dtype=int)
+    )
+    checkpointing_steps = np.unique(
+        np.logspace(0, np.log10(args.max_train_steps), 10, dtype=int)
+    )
     # *******************************************************************************
 
     for epoch in range(starting_epoch, args.num_train_epochs):
