@@ -728,8 +728,11 @@ def main():
     accelerator.print("before train run")
     sys.stdout.flush()
 
-    eval_steps = np.logspace(0, np.log10(args.max_train_steps), 50, dtype=int)
-    checkpointing_steps = np.logspace(0, np.log10(args.max_train_steps), 10, dtype=int)
+    steps_to_save = 20
+    eval_steps = np.unique(np.logspace(0, np.log10(args.max_train_steps), steps_to_save, dtype=int))
+    
+    checkpoints_to_save = 10
+    checkpointing_steps = np.unique(np.logspace(0, np.log10(args.max_train_steps), checkpoints_to_save, dtype=int))
     # *******************************************************************************
 
     for epoch in range(starting_epoch, args.num_train_epochs):
@@ -794,7 +797,7 @@ def main():
                 if completed_steps in checkpointing_steps:
                     accelerator.print("saving checkpoint")
                     sys.stdout.flush()
-                    output_dir = f"step_{completed_steps}"
+                    output_dir = f"{checkpoints_to_save}ckpts/step_{completed_steps}"
                     if args.output_dir is not None:
                         output_dir = os.path.join(args.output_dir, output_dir)
                     save_with_accelerate(accelerator, model, output_dir, args)
