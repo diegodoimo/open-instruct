@@ -768,7 +768,7 @@ def main():
                     avg_loss = (
                         accelerator.gather(total_loss).mean().item()
                         / args.gradient_accumulation_steps
-                        / args.logging_steps
+                        / args.eval_steps
                     )
                     logger.info(
                         f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
