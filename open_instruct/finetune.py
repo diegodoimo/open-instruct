@@ -683,15 +683,7 @@ def main():
     logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
 
-    # ****************************************************************************************
-    completed_steps = 0
-    starting_epoch = 0
-
-    # save pretrained model for double check
-    output_dir = f"epoch_0"
-    if args.output_dir is not None:
-        output_dir = os.path.join(args.output_dir, output_dir)
-    save_with_accelerate(accelerator, model, output_dir, args)
+    # ***************************************************************************************
 
     filename = ""
     if args.out_filename != "":
@@ -716,6 +708,12 @@ def main():
         filename=f"{filename}epoch{args.num_train_epochs}",
     )
 
+    # save pretrained model for double check
+    output_dir = f"epoch_0"
+    if args.output_dir is not None:
+        output_dir = os.path.join(args.output_dir, output_dir)
+    save_with_accelerate(accelerator, model, output_dir, args)
+
     if args.measure_baselines:
         meter.update(
             accelerator=accelerator,
@@ -732,20 +730,24 @@ def main():
     sys.stdout.flush()
 
     steps_to_save = 20
-    eval_steps = np.unique(np.logspace(0, np.log10(args.max_train_steps), steps_to_save, dtype=int))
-    
-    checkpoints_to_save = 10
-    checkpointing_steps = np.unique(np.logspace(0, np.log10(args.max_train_steps), checkpoints_to_save, dtype=int))
-    # *******************************************************************************
+    eval_steps = np.unique(
+        np.logspace(0, np.log10(args.max_train_steps), steps_to_save, dtype=int)
+    )
 
-    for epoch in range(starting_epoch, args.num_train_epochs):
+    checkpoints_to_save = 10
+    checkpointing_steps = np.unique(
+        np.logspace(0, np.log10(args.max_train_steps), checkpoints_to_save, dtype=int)
+    )
+
+    # *******************************************************************************
+    completed_steps = 0
+    total_loss = 0
+    start = time.time()
+    for epoch in range(args.num_train_epochs):
 
         model.train()
-        total_loss = 0
-        active_dataloader = train_dataloader
 
-        start = time.time()
-        for step, batch in enumerate(active_dataloader):
+        for _, batch in enumerate(train_dataloader):
             with accelerator.accumulate(model):
 
                 outputs = model(**batch, use_cache=False)
