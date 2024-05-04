@@ -67,6 +67,8 @@ from peft import PeftModel
 
 # *******************************************************************
 
+import numpy as np
+
 
 logger = get_logger(__name__)
 
@@ -726,6 +728,8 @@ def main():
     accelerator.print("before train run")
     sys.stdout.flush()
 
+    eval_steps = np.logspace(0, np.log10(args.max_train_steps), 50, dtype=int)
+    checkpointing_steps = np.logspace(0, np.log10(args.max_train_steps), 10, dtype=int)
     # *******************************************************************************
 
     for epoch in range(starting_epoch, args.num_train_epochs):
@@ -762,7 +766,7 @@ def main():
             if accelerator.sync_gradients:
                 # progress_bar.update(1)
                 completed_steps += 1
-                if completed_steps % args.eval_steps == 0:
+                if completed_steps in eval_steps:
                     t_tot = time.time() - start
 
                     avg_loss = (
@@ -773,6 +777,7 @@ def main():
                     logger.info(
                         f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
                     )
+                    sys.stdout.flush()
                     total_loss = 0
                     # if completed_steps % args.eval_steps == 0:
 
@@ -786,12 +791,13 @@ def main():
                         do_overlap=args.measure_overlap,
                     )
 
-                if isinstance(checkpointing_steps, int):
-                    if completed_steps % checkpointing_steps == 0:
-                        output_dir = f"step_{completed_steps}"
-                        if args.output_dir is not None:
-                            output_dir = os.path.join(args.output_dir, output_dir)
-                        save_with_accelerate(accelerator, model, output_dir, args)
+                if completed_steps in checkpointing_steps:
+                    accelerator.print("saving checkpoint")
+                    sys.stdout.flush()
+                    output_dir = f"step_{completed_steps}"
+                    if args.output_dir is not None:
+                        output_dir = os.path.join(args.output_dir, output_dir)
+                    save_with_accelerate(accelerator, model, output_dir, args)
 
                 if completed_steps >= args.max_train_steps:
                     break

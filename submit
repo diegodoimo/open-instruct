@@ -57,7 +57,6 @@ accelerate launch \
     --weight_decay 0. \
     --num_train_epochs 4 \
     --output_dir ./results/${model_name}/ \
-    --eval_steps 20 \
     --measure_baselines \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
     --train_on_test \
