@@ -344,7 +344,7 @@ def parse_args():
     )
     parser.add_argument(
         "--mask_path",
-        type="str",
+        type=str,
         default=None,
     )
     parser.add_argument("--overlap_base_dir", type=str, default=None, help="")
