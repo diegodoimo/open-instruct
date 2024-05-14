@@ -59,7 +59,7 @@ accelerate launch \
     --output_dir ./results/${model_name}/ \
     --measure_baselines \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
-    --nsamples_per_subject 20 \
+    --samples_per_subject 20 \
     --out_filename "" 
     #--train_on_test \
     #--mask_path "/u/area/ddoimo/ddoimo/finetuning_llm/open-instruct/open_instruct/my_utils/test_mask_100.npy"   \

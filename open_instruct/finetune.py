@@ -117,7 +117,7 @@ def parse_args():
         "--model_name_or_path",
         type=str,
         help="Path to pretrained model or model identifier from huggingface.co/models.",
-        required=False,
+        default=None,
     )
     parser.add_argument(
         "--config_name",
@@ -512,7 +512,7 @@ def main():
     )
 
     max_seq_len = model.config.max_position_embeddings
-    if args.max_seq_length is not None:
+    if args.max_seq_length is not None and args.model_name_or_path is not None:
         max_seq_len = args.max_seq_length
         if args.model_name_or_path.endswith("llama-2-13b"):
             max_seq_len = 768
@@ -919,10 +919,6 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
     return acc_pred["macro"]
 
 
-# answers = np.array([ans.strip() for ans in answers])
-# predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
-
-
 def compute_accuracy(predictions, answers, subjects=None):
 
     # ground_truths is an array of letters, without trailing spaces
@@ -954,7 +950,7 @@ def compute_accuracy(predictions, answers, subjects=None):
             acc_subj[subject] = acc_tmp
 
     accuracy["subjects"] = acc_subj
-    accuracy["macro"] = np.mean(acc_subj.values())
+    accuracy["macro"] = np.mean(list(acc_subj.values()))
 
     return accuracy
 

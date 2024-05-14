@@ -677,7 +677,6 @@ class MMLU_Dataset:
         assert samples_per_subject is not None or mask_path is not None
 
         dataset = load_dataset("cais/mmlu", "all", split=split)
-        subjects = np.unique(dataset["subject"])
 
         if self.mask_path is not None:
             mask = np.load(self.mask_path)
@@ -690,6 +689,7 @@ class MMLU_Dataset:
                 assert mask.shape[0] == 5700
 
         else:
+            subjects = np.array(dataset["subject"])
             mask = []
             for sub in np.unique(subjects):
                 ind = np.nonzero(sub == subjects)[0]
@@ -699,7 +699,6 @@ class MMLU_Dataset:
 
             mask = np.array(mask)
             final = dataset.select(mask)
-
         return final
 
     def construct_dataset(self):
