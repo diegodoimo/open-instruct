@@ -349,6 +349,13 @@ def parse_args():
         type=str,
         default=None,
     )
+
+    parser.add_argument(
+        "--samples_per_subject",
+        type=int,
+        default=None,
+    )
+
     parser.add_argument("--overlap_base_dir", type=str, default=None, help="")
 
     args = parser.parse_args()
@@ -452,6 +459,10 @@ def main():
             args.output_dir += "/test_balanced"
         else:
             args.output_dir += "/dev_val_balanced"
+
+        if args.samples_per_subject is not None:
+            args.output_dir += f"_{args.samples_per_subject}samples"
+
         args.output_dir += f"/{args.num_train_epochs}epochs"
         os.makedirs(args.output_dir, exist_ok=True)
 
@@ -549,6 +560,7 @@ def main():
         train_on_dev=args.train_on_dev,
         train_on_test=args.train_on_test,
         mask_path=args.mask_path,
+        samples_per_subject=args.samples_per_subject,
     ).construct_dataset()
     accelerator.print(f"num_samples = {len(train_dataset)}")
 
@@ -870,27 +882,81 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         batch_probs = torch.softmax(
             logits[torch.arange(input_ids.shape[0]), seq_len - 1, :], dim=-1
         )
-        if candidate_token_ids is not None:
-            batch_probs = batch_probs[:, candidate_token_ids]
+        # if candidate_token_ids is not None:
+        #     batch_probs = batch_probs[:, candidate_token_ids]
         batch_prediction_indices = torch.argmax(batch_probs, dim=-1)
         predictions += batch_prediction_indices.tolist()
         ground_truths += tokenizer.batch_decode(targets, skip_special_tokens=True)
 
-    assert len(predictions) == len(
-        dataloader.dataset
-    ), "number of predictions should be equal to number of prompts"
+    # assert len(predictions) == len(
+    #     dataloader.dataset
+    # ), "number of predictions should be equal to number of prompts"
 
-    # get the metrics
-    cors = []
-    for i in range(len(predictions)):
-        prediction = choices[predictions[i]]
-        ground_truth = ground_truths[i]
-        cors.append(prediction == ground_truth)
+    # # get the metrics
+    # cors = []
+    # for i in range(len(predictions)):
+    #     prediction = choices[predictions[i]]
+    #     ground_truth = ground_truths[i]
+    #     cors.append(prediction == ground_truth)
 
-    acc = np.mean(cors)
-    model.train()
+    # acc = np.mean(cors)
+    # model.train()
 
-    return acc
+    predictions = torch.tensor(predictions)
+    predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
+
+    answers = dataloader.dataset["answers"]  # letters
+    answers = np.array([ans.strip() for ans in answers])
+
+    subjects = dataloader.dataset["subjects"]
+
+    acc_pred = compute_accuracy(
+        predictions,
+        answers[: len(predictions)],
+        np.array(subjects[: len(predictions)]),
+    )
+
+    return acc_pred["macro"]
+
+
+# answers = np.array([ans.strip() for ans in answers])
+# predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
+
+
+def compute_accuracy(predictions, answers, subjects=None):
+
+    # ground_truths is an array of letters, without trailing spaces
+    # predictions is an array of tokens
+
+    # we remove spaces in from of the letters
+    accuracy = {}
+    tot_ans = len(predictions)
+    num_correct = 0
+    for pred, ans in zip(predictions, answers):
+        if pred == ans:
+            num_correct += 1
+    accuracy["micro"] = num_correct / tot_ans
+
+    if subjects is not None:
+        acc_subj = {}
+        for subject in np.unique(subjects):
+            mask = subject == subjects
+            pred_tmp = predictions[mask]
+            ans_tmp = answers[mask]
+
+            tot_ans = len(ans_tmp)
+            num_correct = 0
+            for pred, ans in zip(pred_tmp, ans_tmp):
+                if pred == ans:
+                    num_correct += 1
+            acc_tmp = num_correct / tot_ans
+
+            acc_subj[subject] = acc_tmp
+
+    accuracy["subjects"] = acc_subj
+    accuracy["macro"] = np.mean(acc_subj.values())
+
+    return accuracy
 
 
 class measure_statistics:
