@@ -237,8 +237,8 @@ def parse_args():
     parser.add_argument(
         "--warmup_ratio",
         type=float,
-        default=0,
-        help="ratio of total training steps used for warmup.",
+        default=None,
+        help="ratio of total training steps used for warmup. 0.03 should be fine.",
     )
     parser.add_argument(
         "--output_dir", type=str, default=".", help="Where to store the final model."

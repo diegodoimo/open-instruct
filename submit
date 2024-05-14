@@ -22,8 +22,8 @@ TOTAL_BATCH_SIZE=16
 BATCH_SIZE_PER_GPU=1
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 
-model_name="llama-2-13b"
-folder="llama_v2"
+model_name="llama-3-8b"
+folder="llama_v3"
 
 # Lora training
 #torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
@@ -53,9 +53,9 @@ accelerate launch \
     --gradient_accumulation_steps $GRADIENT_ACC_STEPS \
     --learning_rate 2e-4 \
     --lr_scheduler_type cosine \
-    --warmup_ratio 0.02 \
+    --warmup_steps 40 \
     --weight_decay 0. \
-    --num_train_epochs 4 \
+    --num_train_epochs 10 \
     --output_dir ./results/${model_name}/ \
     --measure_baselines \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
