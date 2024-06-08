@@ -447,11 +447,6 @@ def main():
         sync_module_states=True,
         forward_prefetch=False,
         activation_checkpointing=False,
-        # mixed_precision_policy=MixedPrecision(
-        #     param_dtype=torch.bfloat16,
-        #     reduce_dtype=torch.bfloat16,
-        #     buffer_dtype=torch.bfloat16,
-        # ),
     )
 
     args.gradient_accumulation_steps, args.total_batch_size = (
