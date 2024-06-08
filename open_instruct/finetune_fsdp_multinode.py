@@ -373,14 +373,24 @@ def parse_args():
     return args
 
 
+def peft_module_casting_to_bf16(model):
+    for name, module in model.named_modules():
+        if isinstance(module, torch.nn.LayerNorm) or "norm" in name:
+            module = module.to(torch.float32)
+        elif any(x in name for x in ["lm_head", "embed_tokens", "wte", "wpe"]):
+            if hasattr(module, "weight"):
+                if module.weight.dtype == torch.float32:
+                    module = module.to(torch.bfloat16)
+
+
 def main():
     args = parse_args()
 
     # Initialize the accelerator. We will let the accelerator handle device placement for us in this example.
     # If we're using tracking, we also need to initialize it here and it will by default pick up all supported trackers
     # in the environment
-    accelerator_log_kwargs = {}
 
+    accelerator_log_kwargs = {}
     if args.with_tracking:
         accelerator_log_kwargs["log_with"] = args.report_to
         accelerator_log_kwargs["project_dir"] = args.output_dir
@@ -388,51 +398,68 @@ def main():
     # os.environ["ACCELERATE_MIXED_PRECISION"] = args.precision
 
     # # # we use fsdp also when world size ==1. accelerate issue in casting
-    # if int(os.environ["WORLD_SIZE"]) > 1:
-    #     os.environ["ACCELERATE_USE_FSDP"] = "true"
+    if int(os.environ["WORLD_SIZE"]) > 1:
+        os.environ["ACCELERATE_USE_FSDP"] = "true"
 
-    # #     os.environ["FSDP_SHRDING_STRATEGY"] = "FULL_SHARD"
-    # #     os.environ["FSDP_AUTO_WRAP_POLICY"] = "TRANSFORMER_BASED_WRAP"
-    # #     os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = "LlamaDecoderLayer"
+        # os.environ["FSDP_SHRDING_STRATEGY"] = "FULL_SHARD"
+        # os.environ["FSDP_AUTO_WRAP_POLICY"] = "TRANSFORMER_BASED_WRAP"
+        # os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = "LlamaDecoderLayer"
 
-    # #     os.environ["FSDP_BACKWARD_PREFETCH"] = "BACKWARD_PRE"
-    # #     os.environ["FSDP_STATE_DICT_TYPE"] = "SHARDED_STATE_DICT"
-    # #     os.environ["FSDP_OFFLOAD_PARAMS"] = "false"
+        # os.environ["FSDP_BACKWARD_PREFETCH"] = "BACKWARD_PRE"
+        # os.environ["FSDP_STATE_DICT_TYPE"] = "SHARDED_STATE_DICT"
+        # os.environ["FSDP_OFFLOAD_PARAMS"] = "false"
 
-    # def lambda_fn(module: torch.nn.Module):
-    #     if isinstance(module, LlamaDecoderLayer):
-    #         return True  # like transformer_auto_wrap_policy
-    #     if isinstance(module, torch.nn.Linear) and all(
-    #         p.requires_grad for p in module.parameters()
-    #     ):
-    #         return True  # wrap each trainable linear separately
-    #     return False
+    def lambda_fn(module: torch.nn.Module):
+        if isinstance(module, LlamaDecoderLayer):
+            return True  # like transformer_auto_wrap_policy
+        if isinstance(module, torch.nn.Linear) and all(
+            p.requires_grad for p in module.parameters()
+        ):
+            return True  # wrap each trainable linear separately
+        return False
 
-    # auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
+    auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
 
-    # fsdp_plugin = FullyShardedDataParallelPlugin(
-    #     sharding_strategy=ShardingStrategy.FULL_SHARD,
-    #     backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
-    #     mixed_precision_policy=MixedPrecision(
-    #         param_dtype=torch.bfloat16,
-    #         reduce_dtype=torch.bfloat16,
-    #         buffer_dtype=torch.bfloat16,
-    #     ),
-    #     auto_wrap_policy=auto_wrap_policy,
-    #     cpu_offload=False,
-    #     ignored_modules=None,
-    #     limit_all_gathers=True,
-    #     use_orig_params=False,
-    #     param_init_fn=None,
-    #     sync_module_states=True,
-    #     forward_prefetch=False,
-    #     activation_checkpointing=False,
-    # )
+    fsdp_plugin = FullyShardedDataParallelPlugin(
+        sharding_strategy=ShardingStrategy.FULL_SHARD,
+        backward_prefetch=BackwardPrefetch.BACKWARD_PRE,
+        auto_wrap_policy=auto_wrap_policy,
+        cpu_offload=False,
+        ignored_modules=None,
+        limit_all_gathers=True,
+        use_orig_params=False,
+        param_init_fn=None,
+        sync_module_states=True,
+        forward_prefetch=False,
+        activation_checkpointing=False,
+        # mixed_precision_policy=MixedPrecision(
+        #     param_dtype=torch.bfloat16,
+        #     reduce_dtype=torch.bfloat16,
+        #     buffer_dtype=torch.bfloat16,
+        # ),
+    )
+
+    def find_grad_accumulation_steps(args, world_size):
+        args.gradient_accumulation_steps = int(
+            args.total_batch_size / world_size / args.batch_size_per_gpu
+        )
+
+        if args.gradient_accumulation_steps < 1:
+            args.gradient_accumulation_steps = 1
+        if args.total_batch_size % (world_size * args.batch_size_per_gpu) != 0:
+            args.total_batch_size = (
+                args.gradient_accumulation_steps * world_size * args.batch_size_per_gpu
+            )
+        return args.gradient_accumulation_steps, args.total_batch_size
+
+    args.gradient_accumulation_steps, args.total_batch_size = (
+        find_grad_accumulation_steps(args, world_size)
+    )
 
     accelerator = Accelerator(
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         **accelerator_log_kwargs,
-        # fsdp_plugin=fsdp_plugin,
+        fsdp_plugin=fsdp_plugin,
     )
     # Make one log on every process with the configuration for debugging.
     logging.basicConfig(
@@ -506,6 +533,16 @@ def main():
             )
             model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
+
+    # Prepare everything with `accelerator`.
+    accelerator.print("memory consumed before loading model")
+    print_memory_consumed()
+    model = accelerator.prepare(model)
+    accelerator.print("memory consumed after loading model")
+    print_memory_consumed()
+    sys.stdout.flush()
+
+    assert False
 
     tokenizer = get_tokenizer(
         tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
@@ -643,7 +680,15 @@ def main():
     # ************************************************************************
 
     # Prepare everything with `accelerator`.
+    accelerator.print("memory consumed before loading model")
+    print_memory_consumed()
     model = accelerator.prepare(model)
+    accelerator.print("memory consumed after loading model")
+    print_memory_consumed()
+    sys.stdout.flush()
+
+    assert False
+
     optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         optimizer, train_loader, lr_scheduler
     )
@@ -675,8 +720,6 @@ def main():
 
     # ****************************************************************************************
 
-    # ****************************************************************************************
-    # Train!
     total_batch_size = (
         args.per_device_train_batch_size
         * accelerator.num_processes
