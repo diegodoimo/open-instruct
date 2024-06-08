@@ -5,13 +5,11 @@
 #SBATCH --time=24:00:00            
 #SBATCH --ntasks-per-node=1       
 #SBATCH --cpus-per-task=32           
-#SBATCH --mem=100G                
+#SBATCH --mem=80G                
 #SBATCH --job-name=test
 #SBATCH --gres=gpu:1 
 
-#source /etc/profile.d/modules.sh
-#module use /opt/nvidia/hpc_sdk/modulefiles/
-#module load nvhpc
+
 source /u/area/ddoimo/anaconda3/bin/activate ./env_amd_new
 
 export OMP_NUM_THREADS=32
@@ -22,31 +20,23 @@ TOTAL_BATCH_SIZE=16
 BATCH_SIZE_PER_GPU=1
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 
-model_name="llama-2-7b"
+model_name="llama-2-13b"
 folder="llama_v2"
 
-#model_name="mistral-1-7b"
-#folder="mistral_v1"
-
-# Lora training
-
-# accelerate launch \
-#     --mixed_precision bf16 \
-#     --num_machines 1 \
-#     --num_processes $NUM_GPUS \
-#     --dynamo_backend 'no' \
-
-#from huggingface tutorials
-MIXED_PRECISION="bf16"
-torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
-       	--nnodes=1  --nproc-per-node=1 \
+accelerate launch \
+    --mixed_precision bf16 \
+    --num_machines 1 \
+    --num_processes $NUM_GPUS \
+    --dynamo_backend 'no' \
+    --use_deepspeed \
+    --deepspeed_config_file ds_configs/stage3_no_offloading_accelerate.conf \
    open_instruct/finetune.py \
-    --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
+    --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/llama/$folder/models_hf/$model_name \
     --use_lora \
     --lora_rank 64 \
     --lora_alpha 16 \
     --lora_dropout 0.1 \
-    --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
+    --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/llama/$folder/models_hf/$model_name \
     --use_slow_tokenizer \
     --train_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/processed/dolly/dolly_data.jsonl \
     --val_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/eval/mmlu \
@@ -60,7 +50,7 @@ torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
     --gradient_accumulation_steps $GRADIENT_ACC_STEPS \
     --learning_rate 2e-4 \
     --lr_scheduler_type cosine \
-    --warmup_ratio 0.05 \
+    --warmup_ratio 0.02 \
     --weight_decay 0. \
     --num_train_epochs 4 \
     --output_dir ./results/${model_name}/ \

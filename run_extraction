@@ -1,0 +1,5 @@
+#!/bin/bash
+for step in 1 2 3 6 12 22 42 77 144 268
+do
+sbatch --export=ALL,step=$step  submit 
+done
