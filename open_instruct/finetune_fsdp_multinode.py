@@ -395,16 +395,16 @@ def lambda_fn(module: torch.nn.Module):
 
 def find_grad_accumulation_steps(args):
     args.gradient_accumulation_steps = int(
-        args.total_batch_size / WORLD_SIZE / args.batch_size_per_gpu
+        args.batch_size / WORLD_SIZE / args.per_device_train_batch_size
     )
 
     if args.gradient_accumulation_steps < 1:
         args.gradient_accumulation_steps = 1
-    if args.total_batch_size % (WORLD_SIZE * args.batch_size_per_gpu) != 0:
-        args.total_batch_size = (
-            args.gradient_accumulation_steps * WORLD_SIZE * args.batch_size_per_gpu
+    if args.batch_size % (WORLD_SIZE * args.per_device_train_batch_size) != 0:
+        args.batch_size = (
+            args.gradient_accumulation_steps * WORLD_SIZE * args.per_device_train_batch_size
         )
-    return args.gradient_accumulation_steps, args.total_batch_size
+    return args.gradient_accumulation_steps, args.batch_size
 
 
 def main():
@@ -449,8 +449,8 @@ def main():
         activation_checkpointing=False,
     )
 
-    args.gradient_accumulation_steps, args.total_batch_size = (
-        find_grad_accumulation_steps(args, world_size)
+    args.gradient_accumulation_steps, args.batch_size = (
+        find_grad_accumulation_steps(args)
     )
 
     accelerator = Accelerator(
