@@ -383,6 +383,30 @@ def peft_module_casting_to_bf16(model):
                     module = module.to(torch.bfloat16)
 
 
+def lambda_fn(module: torch.nn.Module):
+    if isinstance(module, LlamaDecoderLayer):
+        return True  # like transformer_auto_wrap_policy
+    if isinstance(module, torch.nn.Linear) and all(
+        p.requires_grad for p in module.parameters()
+    ):
+        return True  # wrap each trainable linear separately
+    return False
+
+
+def find_grad_accumulation_steps(args):
+    args.gradient_accumulation_steps = int(
+        args.total_batch_size / WORLD_SIZE / args.batch_size_per_gpu
+    )
+
+    if args.gradient_accumulation_steps < 1:
+        args.gradient_accumulation_steps = 1
+    if args.total_batch_size % (WORLD_SIZE * args.batch_size_per_gpu) != 0:
+        args.total_batch_size = (
+            args.gradient_accumulation_steps * WORLD_SIZE * args.batch_size_per_gpu
+        )
+    return args.gradient_accumulation_steps, args.total_batch_size
+
+
 def main():
     args = parse_args()
 
@@ -398,7 +422,7 @@ def main():
     # os.environ["ACCELERATE_MIXED_PRECISION"] = args.precision
 
     # # # we use fsdp also when world size ==1. accelerate issue in casting
-    if int(os.environ["WORLD_SIZE"]) > 1:
+    if WORLD_SIZE > 1:
         os.environ["ACCELERATE_USE_FSDP"] = "true"
 
         # os.environ["FSDP_SHRDING_STRATEGY"] = "FULL_SHARD"
@@ -408,15 +432,6 @@ def main():
         # os.environ["FSDP_BACKWARD_PREFETCH"] = "BACKWARD_PRE"
         # os.environ["FSDP_STATE_DICT_TYPE"] = "SHARDED_STATE_DICT"
         # os.environ["FSDP_OFFLOAD_PARAMS"] = "false"
-
-    def lambda_fn(module: torch.nn.Module):
-        if isinstance(module, LlamaDecoderLayer):
-            return True  # like transformer_auto_wrap_policy
-        if isinstance(module, torch.nn.Linear) and all(
-            p.requires_grad for p in module.parameters()
-        ):
-            return True  # wrap each trainable linear separately
-        return False
 
     auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
 
@@ -438,19 +453,6 @@ def main():
         #     buffer_dtype=torch.bfloat16,
         # ),
     )
-
-    def find_grad_accumulation_steps(args, world_size):
-        args.gradient_accumulation_steps = int(
-            args.total_batch_size / world_size / args.batch_size_per_gpu
-        )
-
-        if args.gradient_accumulation_steps < 1:
-            args.gradient_accumulation_steps = 1
-        if args.total_batch_size % (world_size * args.batch_size_per_gpu) != 0:
-            args.total_batch_size = (
-                args.gradient_accumulation_steps * world_size * args.batch_size_per_gpu
-            )
-        return args.gradient_accumulation_steps, args.total_batch_size
 
     args.gradient_accumulation_steps, args.total_batch_size = (
         find_grad_accumulation_steps(args, world_size)
@@ -1145,4 +1147,5 @@ class measure_statistics:
 
 
 if __name__ == "__main__":
+    WORLD_SIZE = int(os.environ["WORLD_SIZE"])
     main()
