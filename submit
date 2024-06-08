@@ -5,7 +5,7 @@
 #SBATCH --time=24:00:00            
 #SBATCH --ntasks-per-node=1       
 #SBATCH --cpus-per-task=32           
-#SBATCH --mem=80G                
+#SBATCH --mem=100G                
 #SBATCH --job-name=test
 #SBATCH --gres=gpu:1 
 
@@ -22,8 +22,11 @@ TOTAL_BATCH_SIZE=16
 BATCH_SIZE_PER_GPU=1
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 
-model_name="llama-3-8b"
-folder="llama_v3"
+model_name="llama-2-7b"
+folder="llama_v2"
+
+#model_name="mistral-1-7b"
+#folder="mistral_v1"
 
 # Lora training
 #torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
