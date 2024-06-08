@@ -402,7 +402,9 @@ def find_grad_accumulation_steps(args):
         args.gradient_accumulation_steps = 1
     if args.batch_size % (WORLD_SIZE * args.per_device_train_batch_size) != 0:
         args.batch_size = (
-            args.gradient_accumulation_steps * WORLD_SIZE * args.per_device_train_batch_size
+            args.gradient_accumulation_steps
+            * WORLD_SIZE
+            * args.per_device_train_batch_size
         )
     return args.gradient_accumulation_steps, args.batch_size
 
@@ -419,19 +421,10 @@ def main():
         accelerator_log_kwargs["log_with"] = args.report_to
         accelerator_log_kwargs["project_dir"] = args.output_dir
 
-    # os.environ["ACCELERATE_MIXED_PRECISION"] = args.precision
-
     # # # we use fsdp also when world size ==1. accelerate issue in casting
     if WORLD_SIZE > 1:
         os.environ["ACCELERATE_USE_FSDP"] = "true"
-
-        # os.environ["FSDP_SHRDING_STRATEGY"] = "FULL_SHARD"
-        # os.environ["FSDP_AUTO_WRAP_POLICY"] = "TRANSFORMER_BASED_WRAP"
-        # os.environ["FSDP_TRANSFORMER_CLS_TO_WRAP"] = "LlamaDecoderLayer"
-
-        # os.environ["FSDP_BACKWARD_PREFETCH"] = "BACKWARD_PRE"
-        # os.environ["FSDP_STATE_DICT_TYPE"] = "SHARDED_STATE_DICT"
-        # os.environ["FSDP_OFFLOAD_PARAMS"] = "false"
+        os.environ["ACCELERATE_MIXED_PRECISION"] = "bf16"
 
     auto_wrap_policy = partial(lambda_auto_wrap_policy, lambda_fn=lambda_fn)
 
@@ -449,8 +442,8 @@ def main():
         activation_checkpointing=False,
     )
 
-    args.gradient_accumulation_steps, args.batch_size = (
-        find_grad_accumulation_steps(args)
+    args.gradient_accumulation_steps, args.batch_size = find_grad_accumulation_steps(
+        args
     )
 
     accelerator = Accelerator(
@@ -532,14 +525,14 @@ def main():
         model.print_trainable_parameters()
 
     # Prepare everything with `accelerator`.
-    accelerator.print("memory consumed before loading model")
-    print_memory_consumed()
-    model = accelerator.prepare(model)
-    accelerator.print("memory consumed after loading model")
-    print_memory_consumed()
-    sys.stdout.flush()
+    # accelerator.print("memory consumed before loading model")
+    # print_memory_consumed()
+    # model = accelerator.prepare(model)
+    # accelerator.print("memory consumed after loading model")
+    # print_memory_consumed()
+    # sys.stdout.flush()
 
-    assert False
+    # assert False
 
     tokenizer = get_tokenizer(
         tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
@@ -684,8 +677,6 @@ def main():
     print_memory_consumed()
     sys.stdout.flush()
 
-    assert False
-
     optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         optimizer, train_loader, lr_scheduler
     )
@@ -717,12 +708,6 @@ def main():
 
     # ****************************************************************************************
 
-    total_batch_size = (
-        args.per_device_train_batch_size
-        * accelerator.num_processes
-        * args.gradient_accumulation_steps
-    )
-
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
@@ -730,7 +715,7 @@ def main():
         f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
     )
     logger.info(
-        f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
+        f"  Total train batch size (w. parallel, distributed & accumulation) = {args.batch_size}"
     )
     logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
@@ -1047,14 +1032,6 @@ class measure_statistics:
                     else:
                         act = torch.load(f"{ckpt_dir}/{shots}/l{index}_target.pt")
                         act = act.to(torch.float64).numpy()
-
-                        # if norm == "norm":  normalization to be evaluated ex post
-                        #     assert len(act.shape()) == 2, act.shape()
-
-                        #     act = act / np.linalg.norm(act, axis=1, keepdims=True)
-                        #     assert np.all(
-                        #         np.linalg.norm(act, axis=1) == np.ones(act.shape[0])
-                        #     ), np.linalg.norm(act, axis=1)
 
                         _, dist_index, _, _ = compute_distances(
                             X=act,
