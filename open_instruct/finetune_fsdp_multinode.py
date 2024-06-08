@@ -357,6 +357,7 @@ def parse_args():
     )
 
     parser.add_argument("--overlap_base_dir", type=str, default=None, help="")
+    parser.add_argument("--save_checkpoint", action="store_true")
 
     args = parser.parse_args()
 
@@ -764,7 +765,7 @@ def main():
 
     accelerator.print("start training")
     print_memory_consumed()
-    accelerator.print("before train run")
+    accelerator.print("memory before train run")
     sys.stdout.flush()
 
     steps_to_save = 20
@@ -827,9 +828,9 @@ def main():
                     logger.info(
                         f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
                     )
+                    print_memory_consumed()
                     sys.stdout.flush()
                     total_loss = 0
-                    # if completed_steps % args.eval_steps == 0:
 
                     meter.update(
                         accelerator=accelerator,
@@ -841,7 +842,7 @@ def main():
                         do_overlap=args.measure_overlap,
                     )
 
-                if completed_steps in checkpointing_steps:
+                if completed_steps in checkpointing_steps and args.save_checkpoint:
                     accelerator.print("saving checkpoint")
                     sys.stdout.flush()
                     output_dir = f"{checkpoints_to_save}ckpts/step_{completed_steps}"
