@@ -525,15 +525,15 @@ def main():
             model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
 
-    # Prepare everything with `accelerator`.
-    # accelerator.print("memory consumed before loading model")
-    # print_memory_consumed()
-    # model = accelerator.prepare(model)
-    # accelerator.print("memory consumed after loading model")
-    # print_memory_consumed()
-    # sys.stdout.flush()
+    #Prepare everything with `accelerator`.
+    #accelerator.print("memory consumed before loading model")
+    #print_memory_consumed()
+    #model = accelerator.prepare(model)
+    #accelerator.print("memory consumed after loading model")
+    #print_memory_consumed()
+    #sys.stdout.flush()
 
-    # assert False
+    #assert False
 
     tokenizer = get_tokenizer(
         tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
@@ -649,15 +649,45 @@ def main():
 
     # *******************************************************************************
 
+
     gradient_accumulation_iters = max(
         1, int(args.batch_size / args.per_device_train_batch_size / world_size)
     )
-    optimizer = get_optimizer(
-        model=model,
-        learning_rate=args.learning_rate,
-        weight_decay=args.weight_decay,
-    )
+    #optimizer = get_optimizer(
+    #    model=model,
+    #    learning_rate=args.learning_rate,
+    #    weight_decay=args.weight_decay,
+    #)
 
+
+    #no_decay = ["bias", "layer_norm.weight"]
+    #optimizer_grouped_parameters = [
+    #    {
+    #        "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
+    #        "weight_decay": args.weight_decay,
+    #    },
+    #    {
+    #        "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
+    #        "weight_decay": 0.0,
+    #    },
+    #]
+
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+
+
+
+
+    # Prepare everything with `accelerator`.
+    accelerator.print("memory consumed before loading model")
+    print_memory_consumed()
+    model = accelerator.prepare(model)
+    accelerator.print("memory consumed after loading model")
+    print_memory_consumed()
+    sys.stdout.flush()
+
+    assert False
+    
     lr_scheduler, warmup_steps = get_scheduler(
         args.lr_scheduler_type,
         optimizer,
@@ -670,13 +700,9 @@ def main():
 
     # ************************************************************************
 
-    # Prepare everything with `accelerator`.
-    accelerator.print("memory consumed before loading model")
-    print_memory_consumed()
-    model = accelerator.prepare(model)
-    accelerator.print("memory consumed after loading model")
-    print_memory_consumed()
-    sys.stdout.flush()
+
+
+
 
     optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         optimizer, train_loader, lr_scheduler
