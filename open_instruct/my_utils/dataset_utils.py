@@ -479,7 +479,7 @@ def filter_out_long_sequences(tokenized_dataset, max_seq_len):
 # prompt builder
 class MMLU_Dataset:
     # num_few_shots = # shots
-    # model_name number_istences to remove
+    # model_name number_istances to remove
     def __init__(
         self,
         tokenizer,

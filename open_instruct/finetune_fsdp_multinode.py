@@ -38,11 +38,10 @@ from my_utils.dataset_utils import (
 from my_utils.dataloader_utils import get_dataloader
 from my_utils.optimizer_utils import get_optimizer, get_scheduler
 from my_utils.tokenizer_utils import get_tokenizer
-from my_utils.model_utils import get_model_hf, get_model_no_lora
+from my_utils.model_utils import get_model_hf
 
 from overlap_utils.overlap_functions import compute_overlap
 from overlap_utils.helpers import get_embdims, get_target_layers_llama
-from overlap_utils.extract_repr import extract_activations
 
 # with fully sharded daat parallel if we can make this working
 from accelerate import FullyShardedDataParallelPlugin
@@ -53,14 +52,12 @@ from torch.distributed.fsdp import (
     BackwardPrefetch,
 )
 from torch.distributed.fsdp.wrap import (
-    transformer_auto_wrap_policy,
     lambda_auto_wrap_policy,
 )
 from functools import partial
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 
 from collections import defaultdict
-from dadapy.data import Data
 import pickle
 from overlap_utils.pairwise_distances import compute_distances
 from peft import PeftModel
