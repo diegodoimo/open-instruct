@@ -61,6 +61,7 @@ from collections import defaultdict
 import pickle
 from overlap_utils.pairwise_distances import compute_distances
 from peft import PeftModel
+import torch.distributed as dist
 
 # *******************************************************************
 
@@ -906,37 +907,22 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         input_ids = input_ids.to("cuda")
         outputs = model(input_ids)
         logits = outputs.logits
-
         seq_len = torch.sum(mask, dim=1)
-        batch_probs = torch.softmax(
-            logits[torch.arange(input_ids.shape[0]), seq_len - 1, :], dim=-1
-        )
-        # if candidate_token_ids is not None:
-        #     batch_probs = batch_probs[:, candidate_token_ids]
-        batch_prediction_indices = torch.argmax(batch_probs, dim=-1)
+
+        # we alredy select the last one here
+        logits, targets = all_gather_logits(logits, targets, seq_len)
+
+        batch_prediction_indices = torch.argmax(logits, dim=-1)
+
+        # tolist automatically maps to cpu
         predictions += batch_prediction_indices.tolist()
-        ground_truths += tokenizer.batch_decode(targets, skip_special_tokens=True)
-
-    # assert len(predictions) == len(
-    #     dataloader.dataset
-    # ), "number of predictions should be equal to number of prompts"
-
-    # # get the metrics
-    # cors = []
-    # for i in range(len(predictions)):
-    #     prediction = choices[predictions[i]]
-    #     ground_truth = ground_truths[i]
-    #     cors.append(prediction == ground_truth)
-
-    # acc = np.mean(cors)
-    # model.train()
+        ground_truths += tokenizer.batch_decode(targets.cpu(), skip_special_tokens=True)
 
     predictions = torch.tensor(predictions)
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
 
     answers = dataloader.dataset["answers"]  # letters
     answers = np.array([ans.strip() for ans in answers])
-
     subjects = dataloader.dataset["subjects"]
 
     acc_pred = compute_accuracy(
@@ -946,6 +932,30 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
     )
 
     return acc_pred["macro"]
+
+
+def all_gather_logits(logits, targets, seq_len):
+
+    _, _, embdim = logits.shape
+    if WORLD_SIZE > 1:
+        # gather the logits to rank 0
+        logit_list = [
+            torch.zeros((1, embdim), device="cuda", dtype=logits.dtype)
+            for _ in range(WORLD_SIZE)
+        ]
+        target_list = [
+            torch.zeros_like(targets, device="cuda", dtype=targets.dtype)
+            for _ in range(WORLD_SIZE)
+        ]
+        dist.all_gather(logit_list, logits[:, seq_len[0] - 1, :])
+        dist.all_gather(target_list, targets)
+        logits = torch.cat(logit_list, dim=0)
+        targets = torch.cat(target_list, dim=0)
+    else:
+        assert logits.shape[0] == seq_len.shape[0]
+        logits = logits[torch.arange(logits.shape[0]), seq_len - 1, :]
+
+    return logits, targets
 
 
 def compute_accuracy(predictions, answers, subjects=None):
