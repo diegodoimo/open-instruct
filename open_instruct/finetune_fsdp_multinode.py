@@ -935,8 +935,20 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         # predictions += batch_prediction_indices.tolist()
         # ground_truths += tokenizer.batch_decode(targets.cpu(), skip_special_tokens=True)
 
-    predictions = torch.tensor(predictions)
-    predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
+    predictions = torch.cat(predictions)
+    ground_truths = torch.cat(ground_truths)
+    if WORLD_SIZE > 1:
+        pred_list = [torch.zeros_like(predictions) for _ in range(WORLD_SIZE)]
+        target_list = [torch.zeros_like(ground_truths) for _ in range(WORLD_SIZE)]
+        dist.all_gather(pred_list, logits[:, seq_len[0] - 1, :])
+        dist.all_gather(target_list, targets)
+        predictions = torch.cat(pred_list, dim=0).cpu()
+        targets = torch.cat(target_list, dim=0).cpu()
+
+    ground_truths = tokenizer.batch_decode(targets, skip_special_tokens=True)
+    predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+    # predictions = torch.tensor(predictions)
+    # predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
 
     answers = dataloader.dataset["answers"]  # letters
     answers = np.array([ans.strip() for ans in answers])
