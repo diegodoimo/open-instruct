@@ -528,38 +528,8 @@ def main():
     model = accelerator.prepare(model)
     accelerator.print("memory consumed after loading model")
     print_memory_consumed()
-    
-    sys.stdout.flush()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
-    optimizer = accelerator.prepare(optimizer)
-        
-
-    num_requires_grad = 0
-    tot_params = 0
-    for n, p in model.named_parameters():
-        if p.grad is not None:
-            num_requires_grad += p.numel()
-        tot_params += p.numel()
-    print(num_requires_grad / tot_params)
-
-
-    state_dict = optimizer.state_dict()
-    num_internal_parameters = sum(len(v) for v in state_dict['state'].values())
-    print(num_internal_parameters / tot_params) 
     sys.stdout.flush()
 
-    optim_p =0
-    for p in optimizer.state_dict()["state"].values():
-        print(p)
-        sys.stdout.flush()
-        optim_p+=p.numel()
-   
-    print_memory_consumed()
-    print(optim_p / tot_params) 
-    sys.stdout.flush()
-    
-    assert False
-    
     tokenizer = get_tokenizer(
         tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
     )
@@ -695,25 +665,8 @@ def main():
     #    },
     # ]
 
+    # model must be alredy prepared here!
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
-
-    num_requires_grad = 0
-    tot_params = 0
-    for n, p in model.named_parameters():
-        if p.grad is not None:
-            num_requires_grad += p.numel()
-        tot_params += p.numel()
-    print(num_requires_grad / tot_params)
-
-    # Prepare everything with `accelerator`.
-    accelerator.print("memory consumed before loading model")
-    print_memory_consumed()
-    model = accelerator.prepare(model)
-    accelerator.print("memory consumed after loading model")
-    print_memory_consumed()
-    sys.stdout.flush()
-
-    assert False
 
     lr_scheduler, warmup_steps = get_scheduler(
         args.lr_scheduler_type,
@@ -726,7 +679,7 @@ def main():
     )
 
     # ************************************************************************
-
+    # model must be prepared before initializing th optimizer
     optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
         optimizer, train_loader, lr_scheduler
     )
