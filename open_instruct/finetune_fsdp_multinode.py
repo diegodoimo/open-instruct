@@ -900,12 +900,13 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
             )
             sys.stdout.flush()
 
+        
         input_ids, targets, mask = (
-            batch["input_ids"],
-            batch["labels"],
-            batch["attention_mask"],
+            batch["input_ids"].to("cuda"),
+            batch["labels"].to("cuda"),
+            batch["attention_mask"].to("cuda"),
         )
-        input_ids = input_ids.to("cuda")
+        #input_ids = input_ids.to("cuda")
         outputs = model(input_ids)
         logits = outputs.logits
         seq_len = torch.sum(mask, dim=1)
