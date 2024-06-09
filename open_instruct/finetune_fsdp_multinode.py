@@ -937,6 +937,10 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         # predictions += batch_prediction_indices.tolist()
         # ground_truths += tokenizer.batch_decode(targets.cpu(), skip_special_tokens=True)
 
+    if RANK == 0:
+        print(predictions)
+        print(ground_truths)
+
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
     print("\npredictions", predictions.shape)
