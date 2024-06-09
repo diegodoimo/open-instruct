@@ -912,24 +912,25 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
         # we alredy select the last one here
         # logits, targets = all_gather_logits(logits, targets, seq_len)
-
-        print("seq_len", seq_len, seq_len.shape)
-        print("logits", logits.shape)
-        sys.stdout.flush()
+        if iter_num ==0:
+            print("seq_len", seq_len, seq_len.shape)
+            print("\nlogits", logits.shape)
+            sys.stdout.flush()
         last_logits = logits[torch.arange(logits.shape[0]), torch.tensor(seq_len) - 1]
-        print("last_logits", last_logits, last_logits.shape)
-        print("targts", targets, targets.shape)
-        sys.stdout.flush()
-        print(
-            "max_logits",
-            torch.argmax(last_logits, dim=-1),
-            torch.argmax(last_logits, dim=-1).shape,
-        )
-        sys.stdout.flush()
+        
+        if iter_num ==0:
+            print("\nlast_logits", last_logits, last_logits.shape)
+            print("\ntargts", targets, targets.shape)
+            sys.stdout.flush()
+            print(
+                "\nmax_logits",
+                torch.argmax(last_logits, dim=-1),
+                torch.argmax(last_logits, dim=-1).shape,
+            )
+            sys.stdout.flush()
         predictions.extend(torch.argmax(last_logits, dim=-1))
         ground_truths.extend(targets)
 
-        assert False
         # tolist automatically maps to cpu
         # predictions += batch_prediction_indices.tolist()
         # ground_truths += tokenizer.batch_decode(targets.cpu(), skip_special_tokens=True)
