@@ -943,18 +943,43 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
-    print("\npredictions", predictions.shape)
+
+    len_list = [torch.zeros_like(predictions[0:1]) for _ in range(WORLD_SIZE)]
+
+    print(f"\npredictions rank = {RANK}", predictions.shape[0:1])
     sys.stdout.flush()
-    print("\nground_truths", ground_truths.shape)
+
+    dist.all_gather(len_list, predictions.shape[0:1])
+    max_size = sum(len_list)
+    t_size = max(len_list)
+    size_diff = max_size - predictions.shape[0]
+
+    if size_diff > 0:
+        predictions = torch.cat(
+            (predictions, torch.zeros_like(predictions[0:size_diff])), axis=0
+        )
+        ground_truths = torch.cat(
+            (ground_truths, torch.zeros_like(ground_truths[0:size_diff])), axis=0
+        )
+
+    # if RANK == 0:
+    print(f"\npredictions= {RANK}", predictions)
     sys.stdout.flush()
 
     if WORLD_SIZE > 1:
-        pred_list = [torch.zeros_like(predictions) for _ in range(WORLD_SIZE)]
-        target_list = [torch.zeros_like(ground_truths) for _ in range(WORLD_SIZE)]
-        dist.all_gather(pred_list, logits[:, seq_len[0] - 1, :])
+        pred_list = [
+            torch.zeros((1, t_size), device="cuda", dtype=predictions.dtype)
+            for _ in range(WORLD_SIZE)
+        ]
+        target_list = [
+            torch.zeros((1, t_size), device="cuda", dtype=ground_truths.dtype)
+            for _ in range(WORLD_SIZE)
+        ]
+
+        dist.all_gather(pred_list, predictions)
         dist.all_gather(target_list, targets)
-        predictions = torch.cat(pred_list, dim=0).cpu()
-        targets = torch.cat(target_list, dim=0).cpu()
+        predictions = torch.cat(pred_list, dim=0)[:max_size].cpu()
+        targets = torch.cat(target_list, dim=0)[:max_].cpu()
 
     ground_truths = tokenizer.batch_decode(targets, skip_special_tokens=True)
     predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
