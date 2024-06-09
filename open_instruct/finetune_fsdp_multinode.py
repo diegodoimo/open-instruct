@@ -912,22 +912,26 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
         # we alredy select the last one here
         # logits, targets = all_gather_logits(logits, targets, seq_len)
-
-        print("seq_len", seq_len, seq_len.shape)
-        print("logits", logits.shape)
-        sys.stdout.flush()
+        if iter_num ==0:
+            print("seq_len", seq_len, seq_len.shape)
+            print("\nlogits", logits.shape)
+            sys.stdout.flush()
+        
         last_logits = logits[torch.arange(logits.shape[0]), torch.tensor(seq_len) - 1]
-        print("last_logits", last_logits, last_logits.shape)
-        print("targts", targets, targets.shape)
-        sys.stdout.flush()
-        print(
-            "max_logits",
-            torch.argmax(last_logits, dim=-1),
-            torch.argmax(last_logits, dim=-1).shape,
-        )
-        sys.stdout.flush()
+        
+        if iter_num ==0:
+            print("\nlast_logits", last_logits, last_logits.shape)
+            print("\ntargts", targets, targets.shape)
+            sys.stdout.flush()
+            print(
+                "\nmax_logits",
+                torch.argmax(last_logits, dim=-1),
+                torch.argmax(last_logits, dim=-1).shape,
+            )
+            sys.stdout.flush()
         predictions.extend(torch.argmax(last_logits, dim=-1))
         ground_truths.extend(targets)
+        
 
         # tolist automatically maps to cpu
         # predictions += batch_prediction_indices.tolist()
@@ -935,6 +939,11 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
+    print("\npredictions",predictions.shape)
+    sys.stdout.flush()
+    print("\nground_truths",ground_truths.shape)
+    sys.stdout.flush()
+    
     if WORLD_SIZE > 1:
         pred_list = [torch.zeros_like(predictions) for _ in range(WORLD_SIZE)]
         target_list = [torch.zeros_like(ground_truths) for _ in range(WORLD_SIZE)]
