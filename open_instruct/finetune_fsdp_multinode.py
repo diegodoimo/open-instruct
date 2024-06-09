@@ -918,12 +918,14 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
     if WORLD_SIZE > 1:
         pred_list = [torch.zeros_like(predictions) for _ in range(WORLD_SIZE)]
-        target_list = [torch.zeros_like(ground_truths) for _ in range(WORLD_SIZE)]
+        gt_list = [torch.zeros_like(ground_truths) for _ in range(WORLD_SIZE)]
 
         dist.all_gather(pred_list, predictions)
-        dist.all_gather(target_list, ground_truths)
+        dist.all_gather(gt_list, ground_truths)
         predictions = torch.cat(pred_list, dim=0).cpu()
-        targets = torch.cat(target_list, dim=0).cpu()
+        ground_truths = torch.cat(gt_list, dim=0).cpu()
+    
+    print(predictions, ground_truths)
 
     # ground_truths = tokenizer.batch_decode(targets, skip_special_tokens=True)
     # predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
