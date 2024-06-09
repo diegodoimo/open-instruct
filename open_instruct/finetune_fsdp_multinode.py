@@ -897,7 +897,6 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
             batch["labels"].to("cuda"),
             batch["attention_mask"].to("cuda"),
         )
-        # input_ids = input_ids.to("cuda")
         outputs = model(input_ids)
         logits = outputs.logits
         seq_len = torch.sum(mask, dim=1)
@@ -914,14 +913,6 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         predictions.extend(torch.argmax(last_logits, dim=-1, keepdims=True))
         ground_truths.extend(targets)
 
-        # tolist automatically maps to cpu
-        # predictions += batch_prediction_indices.tolist()
-        # ground_truths += tokenizer.batch_decode(targets.cpu(), skip_special_tokens=True)
-
-    if RANK == 0:
-        print(predictions)
-        print(ground_truths)
-
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
 
@@ -934,27 +925,11 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         predictions = torch.cat(pred_list, dim=0).cpu()
         targets = torch.cat(target_list, dim=0).cpu()
 
-    if RANK == 0:
-        print("predictions", predictions)
-        print("ground_truths", ground_truths)
-
     ground_truths = tokenizer.batch_decode(targets, skip_special_tokens=True)
     # predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
 
-    if RANK == 0:
-        print("predictions", predictions)
-        print("ground_truths", ground_truths)
-
-    answers = dataloader.dataset["answers"]  # letters
-    answers = np.array([ans.strip() for ans in answers])
-    subjects = dataloader.dataset["subjects"]
-
-    acc_pred = compute_accuracy(
-        predictions,
-        answers[: len(predictions)],
-        np.array(subjects[: len(predictions)]),
-    )
+    acc_pred = compute_accuracy(predictions, ground_truths)
 
     return acc_pred["macro"]
 
