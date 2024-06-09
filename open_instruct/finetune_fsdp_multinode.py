@@ -925,13 +925,14 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         predictions = torch.cat(pred_list, dim=0).cpu()
         targets = torch.cat(target_list, dim=0).cpu()
 
-    ground_truths = tokenizer.batch_decode(targets, skip_special_tokens=True)
+    # ground_truths = tokenizer.batch_decode(targets, skip_special_tokens=True)
     # predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+    ground_truths = np.array([tokenizer.decode(tg).strip() for tg in ground_truths])
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
 
     acc_pred = compute_accuracy(predictions, ground_truths)
 
-    return acc_pred["macro"]
+    return acc_pred["micro"]
 
 
 def all_gather_logits(logits, targets, seq_len):
