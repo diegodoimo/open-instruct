@@ -885,14 +885,14 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
     model.eval()
 
     predictions, ground_truths = [], []
-    choices = ["A", "B", "C", "D"]
+    # choices = ["A", "B", "C", "D"]
 
-    candidate_token_ids = None
-    if restrict_targets:
-        candidate_token_ids = [
-            tokenizer.encode(" " + answer_choice, add_special_tokens=False)[-1]
-            for answer_choice in choices
-        ]
+    # candidate_token_ids = None
+    # if restrict_targets:
+    #     candidate_token_ids = [
+    #         tokenizer.encode(" " + answer_choice, add_special_tokens=False)[-1]
+    #         for answer_choice in choices
+    #     ]
 
     for iter_num, batch in enumerate(dataloader):
         if (iter_num + 1) % int(2000 / dataloader.batch_size) == 0:
@@ -913,14 +913,14 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
         # we alredy select the last one here
         # logits, targets = all_gather_logits(logits, targets, seq_len)
-        if iter_num == 0:
+        if iter_num == 0 and RANK == 0:
             print("seq_len", seq_len, seq_len.shape)
             print("\nlogits", logits.shape)
             sys.stdout.flush()
 
         last_logits = logits[torch.arange(logits.shape[0]), torch.tensor(seq_len) - 1]
 
-        if iter_num == 0:
+        if iter_num == 0 and RANK == 0:
             print("\nlast_logits", last_logits, last_logits.shape)
             print("\ntargts", targets, targets.shape)
             sys.stdout.flush()
@@ -1170,4 +1170,5 @@ class measure_statistics:
 
 if __name__ == "__main__":
     WORLD_SIZE = int(os.environ["WORLD_SIZE"])
+    RANK = int(os.environ["RANK"])
     main()
