@@ -523,14 +523,6 @@ def main():
             model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
 
-    # Prepare everything with `accelerator` model must be prepared before givin it to the optimizer.
-    # accelerator.print("memory consumed before loading model")
-    print_memory_consumed()
-    model = accelerator.prepare(model)
-    accelerator.print("memory consumed after loading model")
-    print_memory_consumed()
-    sys.stdout.flush()
-
     tokenizer = get_tokenizer(
         tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
     )
@@ -648,6 +640,15 @@ def main():
     gradient_accumulation_iters = max(
         1, int(args.batch_size / args.per_device_train_batch_size / world_size)
     )
+
+    # Prepare everything with `accelerator` model must be prepared before givin it to the optimizer.
+    # accelerator.print("memory consumed before loading model")
+    print_memory_consumed()
+    model = accelerator.prepare(model)
+    accelerator.print("memory consumed after loading model")
+    print_memory_consumed()
+    sys.stdout.flush()
+
     # optimizer = get_optimizer(
     #    model=model,
     #    learning_rate=args.learning_rate,
