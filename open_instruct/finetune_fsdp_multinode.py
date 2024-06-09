@@ -588,6 +588,7 @@ def main():
         subject=None,
         num_processes=args.preprocessing_num_workers,
         split="validation",
+        num_samples=37,
     ).construct_dataset()
 
     test_dataset, longest_seq = MMLU_Dataset(
@@ -912,14 +913,14 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
         # we alredy select the last one here
         # logits, targets = all_gather_logits(logits, targets, seq_len)
-        if iter_num ==0:
+        if iter_num == 0:
             print("seq_len", seq_len, seq_len.shape)
             print("\nlogits", logits.shape)
             sys.stdout.flush()
-        
+
         last_logits = logits[torch.arange(logits.shape[0]), torch.tensor(seq_len) - 1]
-        
-        if iter_num ==0:
+
+        if iter_num == 0:
             print("\nlast_logits", last_logits, last_logits.shape)
             print("\ntargts", targets, targets.shape)
             sys.stdout.flush()
@@ -931,7 +932,6 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
             sys.stdout.flush()
         predictions.extend(torch.argmax(last_logits, dim=-1))
         ground_truths.extend(targets)
-        
 
         # tolist automatically maps to cpu
         # predictions += batch_prediction_indices.tolist()
@@ -939,11 +939,11 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
-    print("\npredictions",predictions.shape)
+    print("\npredictions", predictions.shape)
     sys.stdout.flush()
-    print("\nground_truths",ground_truths.shape)
+    print("\nground_truths", ground_truths.shape)
     sys.stdout.flush()
-    
+
     if WORLD_SIZE > 1:
         pred_list = [torch.zeros_like(predictions) for _ in range(WORLD_SIZE)]
         target_list = [torch.zeros_like(ground_truths) for _ in range(WORLD_SIZE)]
