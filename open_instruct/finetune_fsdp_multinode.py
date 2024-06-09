@@ -767,6 +767,7 @@ def main():
             do_test=True,
         )
 
+    assert False
     accelerator.print("start training")
     print_memory_consumed()
     accelerator.print("memory before train run")
@@ -819,7 +820,6 @@ def main():
 
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
-                # progress_bar.update(1)
                 completed_steps += 1
                 if completed_steps in eval_steps:
                     t_tot = time.time() - start
@@ -886,7 +886,7 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
     predictions, ground_truths = [], []
 
     for iter_num, batch in enumerate(dataloader):
-        if (iter_num + 1) % int(2000 / dataloader.batch_size) == 0:
+        if (iter_num + 1) % int(1000 / dataloader.batch_size) == 0:
             print(
                 f"{iter_num * dataloader.batch_size+1}/ {len(dataloader.dataset)} inputs processed"
             )
