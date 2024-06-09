@@ -930,7 +930,7 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
                 torch.argmax(last_logits, dim=-1).shape,
             )
             sys.stdout.flush()
-        predictions.extend(torch.argmax(last_logits, dim=-1))
+        predictions.extend(torch.argmax(last_logits, dim=-1, keepdims=True))
         ground_truths.extend(targets)
 
         # tolist automatically maps to cpu
@@ -951,16 +951,24 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
     if WORLD_SIZE > 1:
         pred_list = [torch.zeros_like(predictions) for _ in range(WORLD_SIZE)]
         target_list = [torch.zeros_like(ground_truths) for _ in range(WORLD_SIZE)]
-        dist.all_gather(pred_list, logits[:, seq_len[0] - 1, :])
+        dist.all_gather(pred_list, predictions)
         dist.all_gather(target_list, targets)
         predictions = torch.cat(pred_list, dim=0).cpu()
         targets = torch.cat(target_list, dim=0).cpu()
 
+    if RANK == 0:
+        print(predictions, predictions.shape)
+        print(ground_truths, ground_truths.shape)
+    
     ground_truths = tokenizer.batch_decode(targets, skip_special_tokens=True)
     predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     # predictions = torch.tensor(predictions)
     # predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
 
+    if RANK == 0:
+        print(predictions, predictions.shape)
+        print(ground_truths, ground_truths.shape)
+    
     answers = dataloader.dataset["answers"]  # letters
     answers = np.array([ans.strip() for ans in answers])
     subjects = dataloader.dataset["subjects"]
