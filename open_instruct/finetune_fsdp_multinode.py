@@ -980,21 +980,21 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
         dist.all_gather(pred_list, predictions)
         dist.all_gather(target_list, ground_truths)
-        predictions = torch.cat(pred_list, dim=1).cpu()
-        targets = torch.cat(target_list, dim=1).cpu()
+        predictions = torch.cat(pred_list, dim=0).cpu()
+        targets = torch.cat(target_list, dim=0).cpu()
 
     if RANK == 0:
-        print(predictions, predictions)
-        print(ground_truths, ground_truths)
+        print("predictions", predictions)
+        print("ground_truths", ground_truths)
 
+    
     ground_truths = tokenizer.batch_decode(targets, skip_special_tokens=True)
-    predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-    # predictions = torch.tensor(predictions)
-    # predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
+    #predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+    predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
 
     if RANK == 0:
-        print(predictions, predictions)
-        print(ground_truths, ground_truths)
+        print("predictions", predictions)
+        print("ground_truths", ground_truths)
 
     answers = dataloader.dataset["answers"]  # letters
     answers = np.array([ans.strip() for ans in answers])
@@ -1043,7 +1043,7 @@ def compute_accuracy(predictions, answers, subjects=None):
     tot_ans = len(predictions)
     num_correct = 0
     for pred, ans in zip(predictions, answers):
-        if pred == ans:
+        if pred.strip() == ans.strip():
             num_correct += 1
     accuracy["micro"] = num_correct / tot_ans
 
@@ -1051,13 +1051,14 @@ def compute_accuracy(predictions, answers, subjects=None):
         acc_subj = {}
         for subject in np.unique(subjects):
             mask = subject == subjects
+
             pred_tmp = predictions[mask]
             ans_tmp = answers[mask]
 
             tot_ans = len(ans_tmp)
             num_correct = 0
             for pred, ans in zip(pred_tmp, ans_tmp):
-                if pred == ans:
+                if pred.strip() == ans.strip():
                     num_correct += 1
             acc_tmp = num_correct / tot_ans
 
