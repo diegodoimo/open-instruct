@@ -904,7 +904,7 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         # we alredy select the last one here
         # logits, targets = all_gather_logits(logits, targets, seq_len)
         if iter_num == 0 and RANK == 0:
-            print("seq_len", seq_len, seq_len.shape)
+            print("seq_len", seq_len, seq_len.shape, torch.arange(logits.shape[0]), torch.tensor(seq_len) - 1)
             print("\nlogits", logits.shape)
             sys.stdout.flush()
 
@@ -990,8 +990,8 @@ def compute_accuracy(predictions, answers, subjects=None):
 
             acc_subj[subject] = acc_tmp
 
-    accuracy["subjects"] = acc_subj
-    accuracy["macro"] = np.mean(list(acc_subj.values()))
+        accuracy["subjects"] = acc_subj
+        accuracy["macro"] = np.mean(list(acc_subj.values()))
 
     return accuracy
 
