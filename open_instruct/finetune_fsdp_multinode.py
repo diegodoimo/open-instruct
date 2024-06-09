@@ -588,7 +588,6 @@ def main():
         subject=None,
         num_processes=args.preprocessing_num_workers,
         split="validation",
-        num_samples=37,
     ).construct_dataset()
 
     test_dataset, longest_seq = MMLU_Dataset(
@@ -885,14 +884,6 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
     model.eval()
 
     predictions, ground_truths = [], []
-    # choices = ["A", "B", "C", "D"]
-
-    # candidate_token_ids = None
-    # if restrict_targets:
-    #     candidate_token_ids = [
-    #         tokenizer.encode(" " + answer_choice, add_special_tokens=False)[-1]
-    #         for answer_choice in choices
-    #     ]
 
     for iter_num, batch in enumerate(dataloader):
         if (iter_num + 1) % int(2000 / dataloader.batch_size) == 0:
@@ -920,16 +911,6 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
         last_logits = logits[torch.arange(logits.shape[0]), torch.tensor(seq_len) - 1]
 
-        if iter_num == 0 and RANK == 0:
-            print("\nlast_logits", last_logits, last_logits.shape)
-            print("\ntargts", targets, targets.shape)
-            sys.stdout.flush()
-            print(
-                "\nmax_logits",
-                torch.argmax(last_logits, dim=-1),
-                torch.argmax(last_logits, dim=-1).shape,
-            )
-            sys.stdout.flush()
         predictions.extend(torch.argmax(last_logits, dim=-1, keepdims=True))
         ground_truths.extend(targets)
 
@@ -944,37 +925,7 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
 
-    # print(f"rank: {RANK}", predictions.shape)
-    # print(f"rank: {RANK}", ground_truths.shape)
-    # len_list = [torch.zeros_like(predictions[0:1]) for _ in range(WORLD_SIZE)]
-    # print(f"\npredictions rank = {RANK}", predictions.size)
-    # sys.stdout.flush()
-    # dist.all_gather(len_list, torch.tensor([predictions.shape[0]], device="cuda", dtype=len_list[0].dtype))
-    # max_size = max(len_list)
-    # t_size = sum(len_list)
-    # size_diff = max_size - predictions.shape[0]
-    # print(f"\n rank {RANK} max_size, size_diff, predictions_shape", max_size, size_diff, predictions.shape[0])
-    # if size_diff > 0:
-    #     predictions = torch.cat(
-    #         (predictions, torch.zeros_like(predictions[0:size_diff])), axis=0
-    #     )
-    #     ground_truths = torch.cat(
-    #         (ground_truths, torch.zeros_like(ground_truths[0:size_diff])), axis=0
-    #     )
-
-    # # if RANK == 0:
-    # print(f"\npredictions= {RANK}", predictions)
-    # sys.stdout.flush()
-
     if WORLD_SIZE > 1:
-        # pred_list = [
-        #     torch.zeros((1, max_size), device="cuda", dtype=predictions.dtype)
-        #     for _ in range(WORLD_SIZE)
-        # ]
-        # target_list = [
-        #     torch.zeros((1, max_size), device="cuda", dtype=ground_truths.dtype)
-        #     for _ in range(WORLD_SIZE)
-        # ]
         pred_list = [torch.zeros_like(predictions) for _ in range(WORLD_SIZE)]
         target_list = [torch.zeros_like(ground_truths) for _ in range(WORLD_SIZE)]
 
@@ -987,9 +938,8 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         print("predictions", predictions)
         print("ground_truths", ground_truths)
 
-    
     ground_truths = tokenizer.batch_decode(targets, skip_special_tokens=True)
-    #predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+    # predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
 
     if RANK == 0:
