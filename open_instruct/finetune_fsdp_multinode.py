@@ -1044,6 +1044,7 @@ class measure_statistics:
         self.val_loader = val_loader
         self.test_loader = test_loader
         self.filename = filename
+        self.accelerator = accelerator
 
         if prepare_for_overlap:
             assert ckpt_dir is not None
