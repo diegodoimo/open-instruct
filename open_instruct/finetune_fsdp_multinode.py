@@ -943,18 +943,48 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
-    print("\npredictions", predictions.shape)
+
+    print(f"rank: {RANK}", predictions.shape)
+    print(f"rank: {RANK}", ground_truths.shape)
+    len_list = [torch.zeros_like(predictions[0:1]) for _ in range(WORLD_SIZE)]
+
+    print(f"\npredictions rank = {RANK}", predictions.size)
     sys.stdout.flush()
-    print("\nground_truths", ground_truths.shape)
+
+    dist.all_gather(len_list, torch.tensor([predictions.shape[0]], device="cuda", dtype=len_list[0].dtype))
+    max_size = max(len_list)
+    t_size = sum(len_list)
+    size_diff = max_size - predictions.shape[0]
+
+    print(f"\n rank {RANK} max_size, size_diff, predictions_shape", max_size, size_diff, predictions.shape[0])
+
+    if size_diff > 0:
+        predictions = torch.cat(
+            (predictions, torch.zeros_like(predictions[0:size_diff])), axis=0
+        )
+        ground_truths = torch.cat(
+            (ground_truths, torch.zeros_like(ground_truths[0:size_diff])), axis=0
+        )
+
+    # if RANK == 0:
+    print(f"\npredictions= {RANK}", predictions)
     sys.stdout.flush()
 
     if WORLD_SIZE > 1:
-        pred_list = [torch.zeros_like(predictions) for _ in range(WORLD_SIZE)]
-        target_list = [torch.zeros_like(ground_truths) for _ in range(WORLD_SIZE)]
+        pred_list = [
+            torch.zeros((1, max_size), device="cuda", dtype=predictions.dtype)
+            for _ in range(WORLD_SIZE)
+        ]
+        target_list = [
+            torch.zeros((1, max_size), device="cuda", dtype=ground_truths.dtype)
+            for _ in range(WORLD_SIZE)
+        ]
+        
+        print(f"\n rank {RANK} max_size, size_diff, predictions_shape", predictions.shape[0], )
         dist.all_gather(pred_list, predictions)
-        dist.all_gather(target_list, targets)
-        predictions = torch.cat(pred_list, dim=0).cpu()
-        targets = torch.cat(target_list, dim=0).cpu()
+        dist.all_gather(target_list, ground_truths)
+        predictions = torch.cat(pred_list, dim=0)[:max_size].cpu()
+        targets = torch.cat(target_list, dim=0)[:max_size].cpu()
 
     if RANK == 0:
         print(predictions, predictions.shape)
