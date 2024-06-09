@@ -900,25 +900,39 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
             )
             sys.stdout.flush()
 
-        
         input_ids, targets, mask = (
             batch["input_ids"].to("cuda"),
             batch["labels"].to("cuda"),
             batch["attention_mask"].to("cuda"),
         )
-        #input_ids = input_ids.to("cuda")
+        # input_ids = input_ids.to("cuda")
         outputs = model(input_ids)
         logits = outputs.logits
         seq_len = torch.sum(mask, dim=1)
 
         # we alredy select the last one here
-        logits, targets = all_gather_logits(logits, targets, seq_len)
+        # logits, targets = all_gather_logits(logits, targets, seq_len)
 
-        batch_prediction_indices = torch.argmax(logits, dim=-1)
+        print("seq_len", seq_len, seq_len.shape)
+        print("logits", logits.shape)
+        sys.stdout.flush()
+        last_logits = logits[torch.arange(logits.shape[0]), torch.tensor(seq_len) - 1]
+        print("last_logits", last_logits, last_logits.shape)
+        print("targts", targets, targets.shape)
+        sys.stdout.flush()
+        print(
+            "max_logits",
+            torch.argmax(last_logits, dim=-1),
+            torch.argmax(last_logits, dim=-1).shape,
+        )
+        sys.stdout.flush()
+        predictions.extend(torch.argmax(last_logits, dim=-1))
+        ground_truths.extend(targets)
 
+        assert False
         # tolist automatically maps to cpu
-        predictions += batch_prediction_indices.tolist()
-        ground_truths += tokenizer.batch_decode(targets.cpu(), skip_special_tokens=True)
+        # predictions += batch_prediction_indices.tolist()
+        # ground_truths += tokenizer.batch_decode(targets.cpu(), skip_special_tokens=True)
 
     predictions = torch.tensor(predictions)
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
