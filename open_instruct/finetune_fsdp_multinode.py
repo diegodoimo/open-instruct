@@ -764,36 +764,16 @@ def main():
             epoch=0,
             do_overlap=args.measure_overlap,
             do_val=True,
-            do_test=True,
+            do_test=WORLD_SIZE == 1,
         )
 
-    assert False
     accelerator.print("start training")
     print_memory_consumed()
     accelerator.print("memory before train run")
     sys.stdout.flush()
 
-    steps_to_save = 20
-    eval_steps = np.unique(
-        np.around(
-            np.logspace(
-                0,
-                np.log10(args.max_train_steps),
-                steps_to_save,
-            )
-        ).astype(int)
-    )
-
-    checkpoints_to_save = 10
-    checkpointing_steps = np.unique(
-        np.around(
-            np.logspace(
-                0,
-                np.log10(args.max_train_steps),
-                checkpoints_to_save,
-            )
-        ).astype(int)
-    )
+    eval_steps = get_cpt_steps(10, args.max_train_steps, logspace=False)
+    checkpointing_steps = get_cpt_steps(10, args.max_train_steps, logspace=False)
 
     # *******************************************************************************
     completed_steps = 0
@@ -849,7 +829,9 @@ def main():
                 if completed_steps in checkpointing_steps and args.save_checkpoint:
                     accelerator.print("saving checkpoint")
                     sys.stdout.flush()
-                    output_dir = f"{checkpoints_to_save}ckpts/step_{completed_steps}"
+                    output_dir = (
+                        f"{len(checkpointing_steps)}ckpts/step_{completed_steps}"
+                    )
                     if args.output_dir is not None:
                         output_dir = os.path.join(args.output_dir, output_dir)
                     save_with_accelerate(accelerator, model, output_dir, args)
@@ -904,7 +886,13 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         # we alredy select the last one here
         # logits, targets = all_gather_logits(logits, targets, seq_len)
         if iter_num == 0 and RANK == 0:
-            print("seq_len", seq_len, seq_len.shape, torch.arange(logits.shape[0]), torch.tensor(seq_len) - 1)
+            print(
+                "seq_len",
+                seq_len,
+                seq_len.shape,
+                torch.arange(logits.shape[0]),
+                torch.tensor(seq_len) - 1,
+            )
             print("\nlogits", logits.shape)
             sys.stdout.flush()
 
@@ -924,8 +912,6 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         dist.all_gather(gt_list, ground_truths)
         predictions = torch.cat(pred_list, dim=0).cpu()
         ground_truths = torch.cat(gt_list, dim=0).cpu()
-    
-    print(predictions, ground_truths)
 
     # ground_truths = tokenizer.batch_decode(targets, skip_special_tokens=True)
     # predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
@@ -937,36 +923,8 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
     return acc_pred["micro"]
 
 
-def all_gather_logits(logits, targets, seq_len):
-
-    _, _, embdim = logits.shape
-    if WORLD_SIZE > 1:
-        # gather the logits to rank 0
-        logit_list = [
-            torch.zeros((1, embdim), device="cuda", dtype=logits.dtype)
-            for _ in range(WORLD_SIZE)
-        ]
-        target_list = [
-            torch.zeros_like(targets, device="cuda", dtype=targets.dtype)
-            for _ in range(WORLD_SIZE)
-        ]
-        dist.all_gather(logit_list, logits[:, seq_len[0] - 1, :])
-        dist.all_gather(target_list, targets)
-        logits = torch.cat(logit_list, dim=0)
-        targets = torch.cat(target_list, dim=0)
-    else:
-        assert logits.shape[0] == seq_len.shape[0]
-        logits = logits[torch.arange(logits.shape[0]), seq_len - 1, :]
-
-    return logits, targets
-
-
 def compute_accuracy(predictions, answers, subjects=None):
 
-    # ground_truths is an array of letters, without trailing spaces
-    # predictions is an array of tokens
-
-    # we remove spaces in from of the letters
     accuracy = {}
     tot_ans = len(predictions)
     num_correct = 0
@@ -996,6 +954,24 @@ def compute_accuracy(predictions, answers, subjects=None):
         accuracy["macro"] = np.mean(list(acc_subj.values()))
 
     return accuracy
+
+
+def get_cpt_steps(nsteps, max_train_steps, logspace=True):
+
+    if logspace:
+        steps = np.unique(
+            np.around(np.geomspace(1, max_train_steps, nsteps, endpoint=False)).astype(
+                int
+            )
+        )
+    else:
+        steps = np.unique(
+            np.around(
+                np.linspace(0, max_train_steps, nsteps, endpoint=False)[1:]
+            ).astype(int)
+        )
+
+    return steps
 
 
 class measure_statistics:
