@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --partition=DGX
 #SBATCH --account=lade
-#SBATCH --nodes=2
+#SBATCH --nodes=1
 #SBATCH --time=4:00:00            
 #SBATCH --ntasks-per-node=1       
 #SBATCH --cpus-per-task=32           
 #SBATCH --mem=400G  #it is intended per node          
 #SBATCH --job-name=test
-#SBATCH --gres=gpu:5 #it is intended per node
+#SBATCH --gres=gpu:4 #it is intended per node
 
 source /u/area/ddoimo/anaconda3/bin/activate ./env_amd_new
 
@@ -19,7 +19,7 @@ TOTAL_BATCH_SIZE=24
 BATCH_SIZE_PER_GPU=1
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 
-model_name="llama-3-70b"
+model_name="llama-3-8b"
 folder="llama_v3"
 
 #model_name="mistral-1-7b"
@@ -33,7 +33,7 @@ head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
 srun torchrun \
     --nnodes=$SLURM_NTASKS \
     --node-rank=$SLURM_NODEID \
-    --nproc-per-node=5 \
+    --nproc-per-node=4 \
     --rdzv-id=$SLURM_PROCID \
     --rdzv-backend=c10d \
     --rdzv-endpoint=$head_node:29400 \
