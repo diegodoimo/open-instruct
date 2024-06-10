@@ -681,7 +681,7 @@ def main():
     accelerator.print("memory consumed before loading model")
     print_memory_consumed(rank=RANK)
     sys.stdout.flush()
-    
+
     model = accelerator.prepare(model)
     accelerator.print("memory consumed after loading model")
     print_memory_consumed(rank=RANK)
