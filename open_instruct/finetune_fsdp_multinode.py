@@ -486,44 +486,44 @@ def main():
     world_size = accelerator.num_processes
 
     # # *******************************************************
-    # # # Load pretrained model and tokenizer
+    # # Load pretrained model and tokenizer
 
-    # model = get_model_hf(
-    #     accelerator=accelerator,
-    #     model_name_or_path=args.model_name_or_path,
-    #     low_cpu_mem_usage=args.low_cpu_mem_usage,
-    #     precision=torch.bfloat16,
-    #     use_flash_attention_2=False,
-    # )
+    model = get_model_hf(
+        accelerator=accelerator,
+        model_name_or_path=args.model_name_or_path,
+        low_cpu_mem_usage=args.low_cpu_mem_usage,
+        precision=torch.bfloat16,
+        use_flash_attention_2=False,
+    )
 
-    # if args.use_lora:
-    #     from peft import LoraConfig, TaskType, get_peft_model
+    if args.use_lora:
+        from peft import LoraConfig, TaskType, get_peft_model
 
-    #     if args.resume_from_checkpoint:
-    #         accelerator.print("loading pretrained peft models")
-    #         model = PeftModel.from_pretrained(model, args.resume_from_checkpoint)
-    #     else:
-    #         accelerator.print("Initializing LORA model...")
-    #         peft_config = LoraConfig(
-    #             task_type=TaskType.CAUSAL_LM,
-    #             inference_mode=False,
-    #             r=args.lora_rank,
-    #             lora_alpha=args.lora_alpha,
-    #             lora_dropout=args.lora_dropout,
-    #             target_modules=[
-    #                 "q_proj",
-    #                 "o_proj",
-    #                 "v_proj",
-    #                 "k_proj",
-    #                 "gate_proj",
-    #                 "up_proj",
-    #                 "down_proj",
-    #             ],
-    #         )
-    #         model = get_peft_model(model, peft_config)
+        if args.resume_from_checkpoint:
+            accelerator.print("loading pretrained peft models")
+            model = PeftModel.from_pretrained(model, args.resume_from_checkpoint)
+        else:
+            accelerator.print("Initializing LORA model...")
+            peft_config = LoraConfig(
+                task_type=TaskType.CAUSAL_LM,
+                inference_mode=False,
+                r=args.lora_rank,
+                lora_alpha=args.lora_alpha,
+                lora_dropout=args.lora_dropout,
+                target_modules=[
+                    "q_proj",
+                    "o_proj",
+                    "v_proj",
+                    "k_proj",
+                    "gate_proj",
+                    "up_proj",
+                    "down_proj",
+                ],
+            )
+            model = get_peft_model(model, peft_config)
 
-    #     if RANK == 0:
-    #         model.print_trainable_parameters()
+        if RANK == 0:
+            model.print_trainable_parameters()
 
     # ****************************************************************************
     # ****************************************************************************
@@ -642,9 +642,9 @@ def main():
 
     # *******************************************************************************
 
-    gradient_accumulation_iters = max(
-        1, int(args.batch_size / args.per_device_train_batch_size / world_size)
-    )
+    # gradient_accumulation_iters = max(
+    #     1, int(args.batch_size / args.per_device_train_batch_size / world_size)
+    # )
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
@@ -656,26 +656,26 @@ def main():
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
-    if RANK == 0:
-        print(args.gradient_accumulation_steps)
-        print(args.batch_size)
-        print("world size accelerator:", world_size)
-        print("world size torchrun:", WORLD_SIZE)
+    # if RANK == 0:
+    #     print(args.gradient_accumulation_steps)
+    #     print(args.batch_size)
+    #     print("world size accelerator:", world_size)
+    #     print("world size torchrun:", WORLD_SIZE)
 
-    logger.info("***** Running training *****")
-    logger.info(f"  Num examples = {len(train_dataset)}")
-    logger.info(f"  Num Epochs = {args.num_train_epochs}")
-    logger.info(f"  len_dataloader = {len(train_loader)}")
-    logger.info(
-        f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
-    )
-    logger.info(
-        f"  Total train batch size (w. parallel, distributed & accumulation) = {args.batch_size}"
-    )
-    logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
-    logger.info(f"  Total optimization steps = {args.max_train_steps}")
+    # logger.info("***** Running training *****")
+    # logger.info(f"  Num examples = {len(train_dataset)}")
+    # logger.info(f"  Num Epochs = {args.num_train_epochs}")
+    # logger.info(f"  len_dataloader = {len(train_loader)}")
+    # logger.info(
+    #     f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
+    # )
+    # logger.info(
+    #     f"  Total train batch size (w. parallel, distributed & accumulation) = {args.batch_size}"
+    # )
+    # logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
+    # logger.info(f"  Total optimization steps = {args.max_train_steps}")
 
-    assert False
+    # assert False
 
     # Prepare everything with `accelerator` model must be prepared before givin it to the optimizer.
     accelerator.print("memory consumed before loading model")
@@ -715,7 +715,7 @@ def main():
         num_iters=len(train_loader),
         warmup_steps=args.warmup_steps,
         warmup_ratio=args.warmup_ratio,
-        gradient_accumulation_iters=gradient_accumulation_iters,
+        gradient_accumulation_iters=args.gradient_accumulation_steps,
     )
 
     # ************************************************************************
@@ -769,7 +769,7 @@ def main():
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
 
     # ***************************************************************************************
-
+    assert False
     filename = ""
     if args.out_filename != "":
         filename = "_" + args.out_filename
