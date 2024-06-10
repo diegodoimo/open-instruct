@@ -1,6 +1,7 @@
 from pathlib import Path
 import sys
 import torch
+import os
 
 
 def update_config(train_config, **kwargs):
@@ -21,12 +22,39 @@ def update_config(train_config, **kwargs):
     return train_config
 
 
+def get_used_gpu_ids():
+    cuda_visible_devices = os.getenv("CUDA_VISIBLE_DEVICES")
+    if cuda_visible_devices is not None:
+        # Convert the string to a list of integers
+        return [int(x) for x in cuda_visible_devices.split(",")]
+    else:
+        # Default to all available GPUs if CUDA_VISIBLE_DEVICES is not set
+        return list(range(torch.cuda.device_count()))
+
+
+# Function to get the maximum memory allocated across used GPUs
+def get_max_memory_allocated(used_gpu_ids):
+    max_memory = 0
+    for i in used_gpu_ids:
+        max_memory = max(max_memory, torch.cuda.max_memory_allocated(device=i))
+    return max_memory
+
+
+# Function to get the maximum memory reserved across used GPUs
+def get_max_memory_reserved(used_gpu_ids):
+    max_memory = 0
+    for i in used_gpu_ids:
+        max_memory = max(max_memory, torch.cuda.max_memory_reserved(device=i))
+    return max_memory
+
+
 def print_memory_consumed(rank=None):
+    used_gpu_ids = get_used_gpu_ids()
 
     if rank is not None and rank == 0:
         torch.cuda.empty_cache()
-        allocated = torch.cuda.max_memory_allocated() / 2**30
-        reserved = torch.cuda.max_memory_reserved() / 2**30
+        allocated = get_max_memory_allocated(used_gpu_ids) / 2**30
+        reserved = get_max_memory_reserved(used_gpu_ids) / 2**30
         print(f"CUDA mem allocated: {allocated} GB")
         print(f"CUDA mem reserved: {reserved} GB")
     elif rank is None:

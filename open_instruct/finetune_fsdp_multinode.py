@@ -644,7 +644,7 @@ def main():
     )
 
     # Prepare everything with `accelerator` model must be prepared before givin it to the optimizer.
-    # accelerator.print("memory consumed before loading model")
+    accelerator.print("memory consumed before loading model")
     print_memory_consumed(rank=RANK)
     model = accelerator.prepare(model)
     accelerator.print("memory consumed after loading model")
@@ -718,6 +718,7 @@ def main():
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
+    logger.info(f"  len_dataloader = {len(train_dataloader)}")
     logger.info(
         f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
     )
