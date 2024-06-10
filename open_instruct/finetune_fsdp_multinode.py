@@ -521,7 +521,8 @@ def main():
                 ],
             )
             model = get_peft_model(model, peft_config)
-        model.print_trainable_parameters()
+        if RANK == 0:
+            model.print_trainable_parameters()
 
     tokenizer = get_tokenizer(
         tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
