@@ -5,9 +5,9 @@
 #SBATCH --time=4:00:00            
 #SBATCH --ntasks-per-node=1       
 #SBATCH --cpus-per-task=32           
-#SBATCH --mem=600G  #it is intended per node          
+#SBATCH --mem=400G  #it is intended per node          
 #SBATCH --job-name=test
-#SBATCH --gres=gpu:7 #it is intended per node
+#SBATCH --gres=gpu:5 #it is intended per node
 
 source /u/area/ddoimo/anaconda3/bin/activate ./env_amd_new
 
@@ -33,7 +33,7 @@ head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
 srun torchrun \
     --nnodes=$SLURM_NTASKS \
     --node-rank=$SLURM_NODEID \
-    --nproc-per-node=7 \
+    --nproc-per-node=5 \
     --rdzv-id=$SLURM_PROCID \
     --rdzv-backend=c10d \
     --rdzv-endpoint=$head_node:29400 \
