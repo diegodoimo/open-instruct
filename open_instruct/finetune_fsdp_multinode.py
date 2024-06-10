@@ -485,58 +485,61 @@ def main():
     accelerator.wait_for_everyone()
     world_size = accelerator.num_processes
 
-    # *******************************************************
-    # # Load pretrained model and tokenizer
+    # # *******************************************************
+    # # # Load pretrained model and tokenizer
 
-    model = get_model_hf(
-        accelerator=accelerator,
-        model_name_or_path=args.model_name_or_path,
-        low_cpu_mem_usage=args.low_cpu_mem_usage,
-        precision=torch.bfloat16,
-        use_flash_attention_2=False,
-    )
+    # model = get_model_hf(
+    #     accelerator=accelerator,
+    #     model_name_or_path=args.model_name_or_path,
+    #     low_cpu_mem_usage=args.low_cpu_mem_usage,
+    #     precision=torch.bfloat16,
+    #     use_flash_attention_2=False,
+    # )
 
-    if args.use_lora:
-        from peft import LoraConfig, TaskType, get_peft_model
+    # if args.use_lora:
+    #     from peft import LoraConfig, TaskType, get_peft_model
 
-        if args.resume_from_checkpoint:
-            accelerator.print("loading pretrained peft models")
-            model = PeftModel.from_pretrained(model, args.resume_from_checkpoint)
-        else:
-            accelerator.print("Initializing LORA model...")
-            peft_config = LoraConfig(
-                task_type=TaskType.CAUSAL_LM,
-                inference_mode=False,
-                r=args.lora_rank,
-                lora_alpha=args.lora_alpha,
-                lora_dropout=args.lora_dropout,
-                target_modules=[
-                    "q_proj",
-                    "o_proj",
-                    "v_proj",
-                    "k_proj",
-                    "gate_proj",
-                    "up_proj",
-                    "down_proj",
-                ],
-            )
-            model = get_peft_model(model, peft_config)
+    #     if args.resume_from_checkpoint:
+    #         accelerator.print("loading pretrained peft models")
+    #         model = PeftModel.from_pretrained(model, args.resume_from_checkpoint)
+    #     else:
+    #         accelerator.print("Initializing LORA model...")
+    #         peft_config = LoraConfig(
+    #             task_type=TaskType.CAUSAL_LM,
+    #             inference_mode=False,
+    #             r=args.lora_rank,
+    #             lora_alpha=args.lora_alpha,
+    #             lora_dropout=args.lora_dropout,
+    #             target_modules=[
+    #                 "q_proj",
+    #                 "o_proj",
+    #                 "v_proj",
+    #                 "k_proj",
+    #                 "gate_proj",
+    #                 "up_proj",
+    #                 "down_proj",
+    #             ],
+    #         )
+    #         model = get_peft_model(model, peft_config)
 
-        if RANK == 0:
-            model.print_trainable_parameters()
+    #     if RANK == 0:
+    #         model.print_trainable_parameters()
 
+    # ****************************************************************************
+    # ****************************************************************************
+    # ****************************************************************************
     tokenizer = get_tokenizer(
         tokenizer_path=args.tokenizer_name, model_path=args.model_name_or_path
     )
 
-    max_seq_len = model.config.max_position_embeddings
+    # max_seq_len = model.config.max_position_embeddings
+    max_seq_len = 2048
     if args.max_seq_length is not None and args.model_name_or_path is not None:
         max_seq_len = args.max_seq_length
         if args.model_name_or_path.endswith("llama-2-13b"):
             max_seq_len = 768
     accelerator.print("max_seq_len: ", max_seq_len)
 
-    # ****************************************************************************
     # # Preprocessing the datasets.
 
     # train_dataset = get_dataset_open_instruct_new(
@@ -643,6 +646,37 @@ def main():
         1, int(args.batch_size / args.per_device_train_batch_size / world_size)
     )
 
+    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
+    num_update_steps_per_epoch = math.ceil(
+        len(train_loader) / args.gradient_accumulation_steps
+    )
+
+    args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+
+    # Afterwards we recalculate our number of training epochs
+    args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
+
+    if RANK == 0:
+        print(args.gradient_accumulation_steps)
+        print(args.batch_size)
+        print("world size accelerator:", world_size)
+        print("world size torchrun:", WORLD_SIZE)
+
+    logger.info("***** Running training *****")
+    logger.info(f"  Num examples = {len(train_dataset)}")
+    logger.info(f"  Num Epochs = {args.num_train_epochs}")
+    logger.info(f"  len_dataloader = {len(train_loader)}")
+    logger.info(
+        f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
+    )
+    logger.info(
+        f"  Total train batch size (w. parallel, distributed & accumulation) = {args.batch_size}"
+    )
+    logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
+    logger.info(f"  Total optimization steps = {args.max_train_steps}")
+
+    assert False
+
     # Prepare everything with `accelerator` model must be prepared before givin it to the optimizer.
     accelerator.print("memory consumed before loading model")
     print_memory_consumed(rank=RANK)
@@ -684,13 +718,17 @@ def main():
 
     # ************************************************************************
     # model must be prepared before initializing th optimizer
-    optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
+    optimizer, train_loader, lr_scheduler = accelerator.prepare(
         optimizer, train_loader, lr_scheduler
     )
 
+    if RANK == 0:
+        print("batch size:", args.batch_size)
+        print("gradient accumulation steps:", args.gradient_accumulation_steps)
+
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
-        len(train_dataloader) / args.gradient_accumulation_steps
+        len(train_loader) / args.gradient_accumulation_steps
     )
 
     args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
@@ -718,7 +756,7 @@ def main():
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
-    logger.info(f"  len_dataloader = {len(train_dataloader)}")
+    logger.info(f"  len_dataloader = {len(train_loader)}")
     logger.info(
         f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
     )
@@ -786,7 +824,7 @@ def main():
 
         model.train()
 
-        for _, batch in enumerate(train_dataloader):
+        for _, batch in enumerate(train_loader):
             with accelerator.accumulate(model):
 
                 outputs = model(**batch, use_cache=False)
