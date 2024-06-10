@@ -521,6 +521,7 @@ def main():
                 ],
             )
             model = get_peft_model(model, peft_config)
+
         if RANK == 0:
             model.print_trainable_parameters()
 
