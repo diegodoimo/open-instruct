@@ -646,6 +646,8 @@ def main():
     # Prepare everything with `accelerator` model must be prepared before givin it to the optimizer.
     accelerator.print("memory consumed before loading model")
     print_memory_consumed(rank=RANK)
+    sys.stdout.flush()
+    
     model = accelerator.prepare(model)
     accelerator.print("memory consumed after loading model")
     print_memory_consumed(rank=RANK)

@@ -57,13 +57,14 @@ def print_memory_consumed(rank=None):
         reserved = get_max_memory_reserved(used_gpu_ids) / 2**30
         print(f"CUDA mem allocated: {allocated} GB")
         print(f"CUDA mem reserved: {reserved} GB")
+        
     elif rank is None:
         torch.cuda.empty_cache()
         allocated = torch.cuda.max_memory_allocated() / 2**30
         reserved = torch.cuda.max_memory_reserved() / 2**30
         print(f"CUDA mem allocated: {allocated} GB")
         print(f"CUDA mem reserved: {reserved} GB")
-        sys.stdout.flush()
+    sys.stdout.flush()
 
 
 def save_with_accelerate(accelerator, model, output_dir, args):
