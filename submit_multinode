@@ -67,6 +67,7 @@ srun torchrun \
     --lora_dropout 0.1 \
     --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
     --use_slow_tokenizer \
+    --low_cpu_mem_usage \
     --train_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/processed/dolly/dolly_data.jsonl \
     --val_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/eval/mmlu \
     --test_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/eval/mmlu \

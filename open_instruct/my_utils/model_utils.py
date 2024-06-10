@@ -14,6 +14,19 @@ wd = Path(__file__).parent.parent.resolve()
 sys.path.append(str(wd))
 
 
+# Step 1: Import the necessary modules
+from tqdm import tqdm
+
+
+# Step 2: Define a no-op function
+def tqdm_noop(iterable=None, *args, **kwargs):
+    return iterable
+
+
+# Step 3: Monkey patch the tqdm module
+tqdm.__new__ = lambda *args, **kwargs: tqdm_noop
+
+
 def get_model_hf(
     model_name_or_path,
     precision,
