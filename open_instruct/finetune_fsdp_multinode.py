@@ -885,16 +885,6 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
         # we alredy select the last one here
         # logits, targets = all_gather_logits(logits, targets, seq_len)
-        #if iter_num == 0 and RANK == 0:
-        #    print(
-        #        "seq_len",
-        #        seq_len,
-        #        seq_len.shape,
-        #        torch.arange(logits.shape[0]),
-        #        torch.tensor(seq_len) - 1,
-        #    )
-        #    print("\nlogits", logits.shape)
-        #    sys.stdout.flush()
 
         last_logits = logits[torch.arange(logits.shape[0]), torch.tensor(seq_len) - 1]
 
@@ -1115,4 +1105,6 @@ class measure_statistics:
 if __name__ == "__main__":
     WORLD_SIZE = int(os.environ["WORLD_SIZE"])
     RANK = int(os.environ["RANK"])
+    print(WORLD_SIZE, RANK)
+    sys.stdout.flush()
     main()
