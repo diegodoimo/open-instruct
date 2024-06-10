@@ -643,10 +643,10 @@ def main():
 
     # Prepare everything with `accelerator` model must be prepared before givin it to the optimizer.
     # accelerator.print("memory consumed before loading model")
-    print_memory_consumed()
+    print_memory_consumed(rank=RANK)
     model = accelerator.prepare(model)
     accelerator.print("memory consumed after loading model")
-    print_memory_consumed()
+    print_memory_consumed(rank=RANK)
     sys.stdout.flush()
 
     # optimizer = get_optimizer(
@@ -768,7 +768,7 @@ def main():
         )
 
     accelerator.print("start training")
-    print_memory_consumed()
+    print_memory_consumed(rank=RANK)
     accelerator.print("memory before train run")
     sys.stdout.flush()
 
@@ -812,7 +812,7 @@ def main():
                     logger.info(
                         f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
                     )
-                    print_memory_consumed()
+                    print_memory_consumed(rank=RANK)
                     sys.stdout.flush()
                     total_loss = 0
 
@@ -847,7 +847,7 @@ def main():
             do_test=True,
             do_overlap=args.measure_overlap,
         )
-        print_memory_consumed()
+        print_memory_consumed(rank=RANK)
 
         # save model
         output_dir = f"epoch_{epoch+1}"
@@ -1105,6 +1105,4 @@ class measure_statistics:
 if __name__ == "__main__":
     WORLD_SIZE = int(os.environ["WORLD_SIZE"])
     RANK = int(os.environ["RANK"])
-    print(WORLD_SIZE, RANK)
-    sys.stdout.flush()
     main()

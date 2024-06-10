@@ -22,13 +22,17 @@ def update_config(train_config, **kwargs):
 
 
 def print_memory_consumed(rank=None):
-    torch.cuda.empty_cache()
-    allocated = torch.cuda.max_memory_allocated() / 2**30
-    reserved = torch.cuda.max_memory_reserved() / 2**30
+
     if rank is not None and rank == 0:
+        torch.cuda.empty_cache()
+        allocated = torch.cuda.max_memory_allocated() / 2**30
+        reserved = torch.cuda.max_memory_reserved() / 2**30
         print(f"CUDA mem allocated: {allocated} GB")
         print(f"CUDA mem reserved: {reserved} GB")
     else:
+        torch.cuda.empty_cache()
+        allocated = torch.cuda.max_memory_allocated() / 2**30
+        reserved = torch.cuda.max_memory_reserved() / 2**30
         print(f"CUDA mem allocated: {allocated} GB")
         print(f"CUDA mem reserved: {reserved} GB")
     sys.stdout.flush()

@@ -2,13 +2,11 @@
 
 import sys
 from pathlib import Path
-import torch
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
 )
 from transformers import LlamaConfig
-from peft import LoraConfig, TaskType, get_peft_model
 import warnings
 
 # support running without installing as a package
