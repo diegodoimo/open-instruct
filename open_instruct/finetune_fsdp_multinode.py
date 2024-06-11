@@ -476,7 +476,7 @@ def main():
         model_name_or_path=args.model_name_or_path,
         low_cpu_mem_usage=args.low_cpu_mem_usage,
         precision=torch.bfloat16,
-        use_flash_attention_2=False,
+        use_flash_attention_2=args.use_flash_attn,
     )
 
     if args.use_lora:
@@ -645,6 +645,7 @@ def main():
     print_memory_consumed(rank=RANK)
     sys.stdout.flush()
 
+    # should be done after wrapping the model in FSDP
     if args.activation_checkpointing:
         accelerator.print(model)
         sys.stdout.flush()
@@ -749,7 +750,6 @@ def main():
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
 
     # ***************************************************************************************
-    assert False
     filename = ""
     if args.out_filename != "":
         filename = "_" + args.out_filename

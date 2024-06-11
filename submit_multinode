@@ -66,7 +66,8 @@ srun torchrun \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
     --samples_per_subject 20 \
     --out_filename ""  \
-    --activation_checkpointing
+    --activation_checkpointing \
+    --use_flash_attn 
     #--train_on_test \
     #--mask_path "/u/area/ddoimo/ddoimo/finetuning_llm/open-instruct/open_instruct/my_utils/test_mask_100.npy"   \
 #--learning_rate 1e-4 \
