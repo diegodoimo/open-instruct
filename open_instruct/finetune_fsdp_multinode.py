@@ -387,12 +387,10 @@ def lambda_fn(module: torch.nn.Module):
 
 
 def find_grad_accumulation_steps(args):
-    gradient_accumulation_steps = int(
-        args.batch_size / WORLD_SIZE / args.per_device_train_batch_size
+    gradient_accumulation_steps = max(
+        1, int(args.batch_size / WORLD_SIZE / args.per_device_train_batch_size)
     )
 
-    if gradient_accumulation_steps < 1:
-        gradient_accumulation_steps = 1
     if args.batch_size % (WORLD_SIZE * args.per_device_train_batch_size) != 0:
         args.batch_size = (
             gradient_accumulation_steps * WORLD_SIZE * args.per_device_train_batch_size
@@ -601,14 +599,13 @@ def main():
     assert args.per_device_eval_batch_size == 1
 
     # # DataLoaders creation:
-    train_loader, train_sampler = get_dataloader(
+    train_loader = get_dataloader(
         dataset=train_dataset,
         batch_size=args.per_device_train_batch_size,
         pad_token_id=tokenizer.pad_token_id,
         world_size=world_size,
         shuffle=True,
         num_processes=6,
-        return_sampler=True,
     )
 
     val_loader = get_dataloader(
@@ -632,10 +629,6 @@ def main():
 
     # *******************************************************************************
 
-    # gradient_accumulation_iters = max(
-    #     1, int(args.batch_size / args.per_device_train_batch_size / world_size)
-    # )
-
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
         len(train_loader) / gradient_accumulation_steps
@@ -645,27 +638,6 @@ def main():
 
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
-
-    # if RANK == 0:
-    #     print(gradient_accumulation_steps)
-    #     print(args.batch_size)
-    #     print("world size accelerator:", world_size)
-    #     print("world size torchrun:", WORLD_SIZE)
-
-    # logger.info("***** Running training *****")
-    # logger.info(f"  Num examples = {len(train_dataset)}")
-    # logger.info(f"  Num Epochs = {args.num_train_epochs}")
-    # logger.info(f"  len_dataloader = {len(train_loader)}")
-    # logger.info(
-    #     f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
-    # )
-    # logger.info(
-    #     f"  Total train batch size (w. parallel, distributed & accumulation) = {args.batch_size}"
-    # )
-    # logger.info(f"  Gradient Accumulation steps = {gradient_accumulation_steps}")
-    # logger.info(f"  Total optimization steps = {args.max_train_steps}")
-
-    # assert False
 
     # Prepare everything with `accelerator` model must be prepared before givin it to the optimizer.
     accelerator.print("memory consumed before loading model")
@@ -710,7 +682,7 @@ def main():
 
     # ************************************************************************
     # model must be prepared before initializing th optimizer
-    #we already setup the dataloader for distributed training
+    # we already setup the dataloader for distributed training
     optimizer, lr_scheduler = accelerator.prepare(optimizer, lr_scheduler)
 
     if RANK == 0:
