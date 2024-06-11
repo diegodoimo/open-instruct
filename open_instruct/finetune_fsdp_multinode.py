@@ -644,6 +644,7 @@ def main():
     print_memory_consumed(rank=RANK)
     sys.stdout.flush()
 
+    model.gradient_checkpointing_enable()
     model = accelerator.prepare(model)
     accelerator.print("memory consumed after loading model")
     print_memory_consumed(rank=RANK)
@@ -668,10 +669,6 @@ def main():
     # we already setup the dataloader for distributed training
     optimizer, lr_scheduler = accelerator.prepare(optimizer, lr_scheduler)
 
-    if RANK == 0:
-        print("batch size:", train_loader.batch_size)
-        print("len_train_loader", len(train_loader))
-        print("gradient accumulation steps:", gradient_accumulation_steps)
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
@@ -714,7 +711,6 @@ def main():
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
 
     # ***************************************************************************************
-    assert False
     filename = ""
     if args.out_filename != "":
         filename = "_" + args.out_filename
