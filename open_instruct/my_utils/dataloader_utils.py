@@ -21,10 +21,6 @@ def get_dataloader(
     return_sampler=False,
 ):
     if collate_fn is None:
-        # collate_fn = DataCollatorForCausalLM(
-        #     pad_token_id=pad_token_id, max_seq_len=max_seq_len
-        # )
-
         collate_fn = DataCollatorForCausalLM(pad_token_id=pad_token_id)
 
     if world_size > 1:

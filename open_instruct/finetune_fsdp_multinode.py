@@ -202,12 +202,6 @@ def parse_args():
         help="Total number of training steps to perform. If provided, overrides num_train_epochs.",
     )
     parser.add_argument(
-        "--gradient_accumulation_steps",
-        type=int,
-        default=1,
-        help="Number of updates steps to accumulate before performing a backward/update pass.",
-    )
-    parser.add_argument(
         "--lr_scheduler_type",
         type=SchedulerType,
         default="linear",
@@ -393,19 +387,15 @@ def lambda_fn(module: torch.nn.Module):
 
 
 def find_grad_accumulation_steps(args):
-    args.gradient_accumulation_steps = int(
-        args.batch_size / WORLD_SIZE / args.per_device_train_batch_size
+    gradient_accumulation_steps = max(
+        1, int(args.batch_size / WORLD_SIZE / args.per_device_train_batch_size)
     )
 
-    if args.gradient_accumulation_steps < 1:
-        args.gradient_accumulation_steps = 1
     if args.batch_size % (WORLD_SIZE * args.per_device_train_batch_size) != 0:
         args.batch_size = (
-            args.gradient_accumulation_steps
-            * WORLD_SIZE
-            * args.per_device_train_batch_size
+            gradient_accumulation_steps * WORLD_SIZE * args.per_device_train_batch_size
         )
-    return args.gradient_accumulation_steps, args.batch_size
+    return gradient_accumulation_steps, args.batch_size
 
 
 def main():
@@ -441,12 +431,10 @@ def main():
         activation_checkpointing=False,
     )
 
-    args.gradient_accumulation_steps, args.batch_size = find_grad_accumulation_steps(
-        args
-    )
+    gradient_accumulation_steps, args.batch_size = find_grad_accumulation_steps(args)
 
     accelerator = Accelerator(
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        gradient_accumulation_steps=gradient_accumulation_steps,
         **accelerator_log_kwargs,
         fsdp_plugin=fsdp_plugin,
     )
@@ -611,14 +599,13 @@ def main():
     assert args.per_device_eval_batch_size == 1
 
     # # DataLoaders creation:
-    train_loader, train_sampler = get_dataloader(
-        train_dataset,
-        args.per_device_train_batch_size,
-        tokenizer.pad_token_id,
+    train_loader = get_dataloader(
+        dataset=train_dataset,
+        batch_size=args.per_device_train_batch_size,
+        pad_token_id=tokenizer.pad_token_id,
         world_size=world_size,
         shuffle=True,
         num_processes=6,
-        return_sampler=True,
     )
 
     val_loader = get_dataloader(
@@ -642,13 +629,9 @@ def main():
 
     # *******************************************************************************
 
-    # gradient_accumulation_iters = max(
-    #     1, int(args.batch_size / args.per_device_train_batch_size / world_size)
-    # )
-
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
-        len(train_loader) / args.gradient_accumulation_steps
+        len(train_loader) / gradient_accumulation_steps
     )
 
     args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
@@ -656,12 +639,11 @@ def main():
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
-
     # Prepare everything with `accelerator` model must be prepared before givin it to the optimizer.
     accelerator.print("memory consumed before loading model")
     print_memory_consumed(rank=RANK)
     sys.stdout.flush()
-    
+
     model = accelerator.prepare(model)
     accelerator.print("memory consumed after loading model")
     print_memory_consumed(rank=RANK)
@@ -678,14 +660,13 @@ def main():
         num_iters=len(train_loader),
         warmup_steps=args.warmup_steps,
         warmup_ratio=args.warmup_ratio,
-        gradient_accumulation_iters=args.gradient_accumulation_steps,
+        gradient_accumulation_iters=gradient_accumulation_steps,
     )
 
     # ************************************************************************
     # model must be prepared before initializing th optimizer
-    optimizer, train_loader, lr_scheduler = accelerator.prepare(
-        optimizer, train_loader, lr_scheduler
-    )
+    # we already setup the dataloader for distributed training
+    optimizer, lr_scheduler = accelerator.prepare(optimizer, lr_scheduler)
 
     if RANK == 0:
         print("batch size:", train_loader.batch_size)
@@ -694,7 +675,7 @@ def main():
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
-        len(train_loader) / args.gradient_accumulation_steps
+        len(train_loader) / gradient_accumulation_steps
     )
 
     args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
@@ -729,7 +710,7 @@ def main():
     logger.info(
         f"  Total train batch size (w. parallel, distributed & accumulation) = {args.batch_size}"
     )
-    logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
+    logger.info(f"  Gradient Accumulation steps = {gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
 
     # ***************************************************************************************
@@ -813,7 +794,7 @@ def main():
 
                     avg_loss = (
                         accelerator.gather(total_loss).mean().item()
-                        / args.gradient_accumulation_steps
+                        / gradient_accumulation_steps
                         / args.eval_steps
                     )
                     logger.info(
