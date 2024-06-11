@@ -366,16 +366,6 @@ def parse_args():
     return args
 
 
-def peft_module_casting_to_bf16(model):
-    for name, module in model.named_modules():
-        if isinstance(module, torch.nn.LayerNorm) or "norm" in name:
-            module = module.to(torch.float32)
-        elif any(x in name for x in ["lm_head", "embed_tokens", "wte", "wpe"]):
-            if hasattr(module, "weight"):
-                if module.weight.dtype == torch.float32:
-                    module = module.to(torch.bfloat16)
-
-
 def lambda_fn(module: torch.nn.Module):
     if isinstance(module, LlamaDecoderLayer):
         return True  # like transformer_auto_wrap_policy
@@ -640,14 +630,37 @@ def main():
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
     # Prepare everything with `accelerator` model must be prepared before givin it to the optimizer.
+    # maybe shold be called after the preparation
+    # model.gradient_checkpointing_enable()
     accelerator.print("memory consumed before loading model")
     print_memory_consumed(rank=RANK)
     sys.stdout.flush()
-
     model = accelerator.prepare(model)
     accelerator.print("memory consumed after loading model")
     print_memory_consumed(rank=RANK)
     sys.stdout.flush()
+
+    if args.activation_checkpointing:
+        accelerator.print(model)
+        sys.stdout.flush()
+        from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
+            checkpoint_wrapper,
+            CheckpointImpl,
+            apply_activation_checkpointing,
+        )
+
+        check_fn = lambda submodule: isinstance(submodule, LlamaDecoderLayer)
+        non_reentrant_wrapper = partial(
+            checkpoint_wrapper,
+            offload_to_cpu=False,
+            checkpoint_impl=CheckpointImpl.NO_REENTRANT,
+        )
+
+        apply_activation_checkpointing(
+            model, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=check_fn
+        )
+        accelerator.print(model)
+        sys.stdout.flush()
 
     # optimizer = get_optimizer(
     #    model=model,
