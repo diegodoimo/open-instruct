@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=32           
 #SBATCH --mem=400G  #it is intended per node          
 #SBATCH --job-name=test
-#SBATCH --gres=gpu:4 #it is intended per node
+#SBATCH --gres=gpu:2 #it is intended per node
 
 source /u/area/ddoimo/anaconda3/bin/activate ./env_amd_new
 
@@ -33,7 +33,7 @@ head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
 srun torchrun \
     --nnodes=$SLURM_NTASKS \
     --node-rank=$SLURM_NODEID \
-    --nproc-per-node=4 \
+    --nproc-per-node=2 \
     --rdzv-id=$SLURM_PROCID \
     --rdzv-backend=c10d \
     --rdzv-endpoint=$head_node:29400 \
@@ -65,7 +65,8 @@ srun torchrun \
     --measure_baselines \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
     --samples_per_subject 20 \
-    --out_filename "" 
+    --out_filename ""  \
+    --activation_checkpointing
     #--train_on_test \
     #--mask_path "/u/area/ddoimo/ddoimo/finetuning_llm/open-instruct/open_instruct/my_utils/test_mask_100.npy"   \
 #--learning_rate 1e-4 \

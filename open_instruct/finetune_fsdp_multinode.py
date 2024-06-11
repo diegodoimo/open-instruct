@@ -348,6 +348,11 @@ def parse_args():
         default=None,
     )
 
+    parser.add_argument(
+        "--activation_checkpointing",
+        action="store_true",
+    )
+
     parser.add_argument("--overlap_base_dir", type=str, default=None, help="")
     parser.add_argument("--save_checkpoint", action="store_true")
 
@@ -699,7 +704,8 @@ def main():
     optimizer, lr_scheduler = accelerator.prepare(optimizer, lr_scheduler)
 
     if RANK == 0:
-        print("batch size:", args.batch_size)
+        print("batch size:", train_loader.batch_size)
+        print("len_train_loader", len(train_loader))
         print("gradient accumulation steps:", gradient_accumulation_steps)
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
