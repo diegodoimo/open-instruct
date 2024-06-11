@@ -704,10 +704,6 @@ def main():
     # we already setup the dataloader for distributed training
     optimizer, lr_scheduler = accelerator.prepare(optimizer, lr_scheduler)
 
-    if RANK == 0:
-        print("batch size:", train_loader.batch_size)
-        print("len_train_loader", len(train_loader))
-        print("gradient accumulation steps:", gradient_accumulation_steps)
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
