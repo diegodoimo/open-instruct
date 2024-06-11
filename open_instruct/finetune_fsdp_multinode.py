@@ -656,26 +656,6 @@ def main():
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
-    # if RANK == 0:
-    #     print(args.gradient_accumulation_steps)
-    #     print(args.batch_size)
-    #     print("world size accelerator:", world_size)
-    #     print("world size torchrun:", WORLD_SIZE)
-
-    # logger.info("***** Running training *****")
-    # logger.info(f"  Num examples = {len(train_dataset)}")
-    # logger.info(f"  Num Epochs = {args.num_train_epochs}")
-    # logger.info(f"  len_dataloader = {len(train_loader)}")
-    # logger.info(
-    #     f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
-    # )
-    # logger.info(
-    #     f"  Total train batch size (w. parallel, distributed & accumulation) = {args.batch_size}"
-    # )
-    # logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
-    # logger.info(f"  Total optimization steps = {args.max_train_steps}")
-
-    # assert False
 
     # Prepare everything with `accelerator` model must be prepared before givin it to the optimizer.
     accelerator.print("memory consumed before loading model")
@@ -687,23 +667,6 @@ def main():
     print_memory_consumed(rank=RANK)
     sys.stdout.flush()
 
-    # optimizer = get_optimizer(
-    #    model=model,
-    #    learning_rate=args.learning_rate,
-    #    weight_decay=args.weight_decay,
-    # )
-
-    # no_decay = ["bias", "layer_norm.weight"]
-    # optimizer_grouped_parameters = [
-    #    {
-    #        "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
-    #        "weight_decay": args.weight_decay,
-    #    },
-    #    {
-    #        "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
-    #        "weight_decay": 0.0,
-    #    },
-    # ]
 
     # model must be alredy prepared here!
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
@@ -725,7 +688,8 @@ def main():
     )
 
     if RANK == 0:
-        print("batch size:", args.batch_size)
+        print("batch size:", train_loader.batch_size)
+        print("len_train_loader", len(train_loader))
         print("gradient accumulation steps:", args.gradient_accumulation_steps)
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
