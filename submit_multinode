@@ -34,7 +34,7 @@ srun torchrun \
     --nproc-per-node=2 \
     --rdzv-id=$SLURM_PROCID \
     --rdzv-backend=c10d \
-    --rdzv-endpoint=$head_node:29400 \
+    --rdzv-endpoint=$head_node:29401 \
    open_instruct/finetune_fsdp_multinode.py \
     --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
     --use_lora \
@@ -63,7 +63,7 @@ srun torchrun \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
     --samples_per_subject 20 \
     --out_filename ""  \
-    --activation_checkpointing
+    #--activation_checkpointing
     #--train_on_test \
     #--mask_path "/u/area/ddoimo/ddoimo/finetuning_llm/open-instruct/open_instruct/my_utils/test_mask_100.npy"   \
 #--learning_rate 1e-4 \

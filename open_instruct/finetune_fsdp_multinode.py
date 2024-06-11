@@ -655,9 +655,13 @@ def main():
         )
 
         check_fn = lambda submodule: isinstance(submodule, LlamaDecoderLayer)
+        #non_reentrant_wrapper = partial(
+        #checkpoint_wrapper,
+         #   offload_to_cpu=False,
+         #   checkpoint_impl=CheckpointImpl.NO_REENTRANT,
+        #)
         non_reentrant_wrapper = partial(
             checkpoint_wrapper,
-            offload_to_cpu=False,
             checkpoint_impl=CheckpointImpl.NO_REENTRANT,
         )
 
