@@ -692,7 +692,7 @@ def main():
     sys.stdout.flush()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
 
-    lr_scheduler, _ = get_scheduler(
+    lr_scheduler = get_scheduler(
         args.lr_scheduler_type,
         optimizer,
         epochs=args.num_train_epochs,
