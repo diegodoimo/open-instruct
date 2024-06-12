@@ -692,7 +692,7 @@ def main():
     sys.stdout.flush()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
 
-    lr_scheduler = get_scheduler(
+    lr_scheduler, _ = get_scheduler(
         args.lr_scheduler_type,
         optimizer,
         epochs=args.num_train_epochs,
@@ -1092,7 +1092,7 @@ class measure_statistics:
             self.train_stats["loss"][completed_steps] = loss
 
         if do_val:
-            accelerator.print("overlap computation started")
+            accelerator.print("mesuering validation accuracy")
             sys.stdout.flush()
             acc = evaluate(
                 model=model,
@@ -1104,7 +1104,7 @@ class measure_statistics:
             self.train_stats["mmlu_val"][completed_steps] = acc
 
         if do_test:
-            accelerator.print("overlap computation started")
+            accelerator.print("measuring test accuracy")
             sys.stdout.flush()
             acc = evaluate(
                 model=model,
