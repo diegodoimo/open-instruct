@@ -766,7 +766,7 @@ def main():
             completed_steps=0,
             epoch=0,
             do_overlap=args.measure_overlap,
-            do_val=False,
+            do_val=True,
             do_test=WORLD_SIZE == 1,
         )
 

@@ -77,7 +77,7 @@ def get_scheduler(
         num_training_steps=num_training_steps_for_scheduler,
         num_warmup_steps=warmup_steps,
     )
-    return scheduler, warmup_steps
+    return scheduler
 
     # LINEAR = "linear"
     # COSINE = "cosine"
