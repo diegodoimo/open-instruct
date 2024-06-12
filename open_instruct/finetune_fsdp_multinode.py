@@ -76,11 +76,6 @@ def parse_args():
         description="Finetune a transformers model on a causal language modeling task"
     )
     parser.add_argument(
-        "--eval_steps",
-        type=int,
-        default=100,
-    )
-    parser.add_argument(
         "--dataset_name",
         type=str,
         default=None,
@@ -255,14 +250,19 @@ def parse_args():
     parser.add_argument(
         "--checkpointing_steps",
         type=str,
-        default=None,
+        default=10,
         help="Whether the various states should be saved at the end of every n steps, or 'epoch' for each epoch.",
     )
     parser.add_argument(
         "--logging_steps",
         type=int,
-        default=None,
+        default=100,
         help="Log the training loss and learning rate every logging_steps steps.",
+    )
+    parser.add_argument(
+        "--eval_steps",
+        type=int,
+        default=10,
     )
     parser.add_argument(
         "--resume_from_checkpoint",
@@ -693,7 +693,7 @@ def main():
     # model must be alredy prepared here!
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
 
-    lr_scheduler, warmup_steps = get_scheduler(
+    lr_scheduler = get_scheduler(
         args.lr_scheduler_type,
         optimizer,
         epochs=args.num_train_epochs,
@@ -708,7 +708,6 @@ def main():
     # we already setup the dataloader for distributed training
     optimizer, lr_scheduler = accelerator.prepare(optimizer, lr_scheduler)
 
-
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
         len(train_loader) / gradient_accumulation_steps
@@ -719,11 +718,6 @@ def main():
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
-    # Figure out how many steps we should save the Accelerator states
-    checkpointing_steps = args.checkpointing_steps
-    if checkpointing_steps is not None and checkpointing_steps.isdigit():
-        checkpointing_steps = int(checkpointing_steps)
-
     # We need to initialize the trackers we use, and also store our configuration.
     # The trackers initializes automatically on the main process.
     if args.with_tracking:
@@ -733,21 +727,6 @@ def main():
             "lr_scheduler_type"
         ].value
         accelerator.init_trackers("open_instruct", experiment_config)
-
-    # ****************************************************************************************
-
-    logger.info("***** Running training *****")
-    logger.info(f"  Num examples = {len(train_dataset)}")
-    logger.info(f"  Num Epochs = {args.num_train_epochs}")
-    logger.info(f"  len_dataloader = {len(train_loader)}")
-    logger.info(
-        f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
-    )
-    logger.info(
-        f"  Total train batch size (w. parallel, distributed & accumulation) = {args.batch_size}"
-    )
-    logger.info(f"  Gradient Accumulation steps = {gradient_accumulation_steps}")
-    logger.info(f"  Total optimization steps = {args.max_train_steps}")
 
     # ***************************************************************************************
     filename = ""
@@ -795,10 +774,27 @@ def main():
     accelerator.print("memory before train run")
     sys.stdout.flush()
 
-    eval_steps = get_cpt_steps(10, args.max_train_steps, logspace=False)
-    checkpointing_steps = get_cpt_steps(10, args.max_train_steps, logspace=False)
-
+    eval_steps = get_cpt_steps(args.eval_steps, args.max_train_steps, logspace=False)
+    checkpointing_steps = get_cpt_steps(
+        args.checkpoint_steps, args.max_train_steps, logspace=False
+    )
+    log_steps = get_cpt_steps(args.logging_steps, args.max_train_steps, logspace=False)
     # *******************************************************************************
+
+    logger.info("***** Running training *****")
+    logger.info(f"  Num examples = {len(train_dataset)}")
+    logger.info(f"  Num Epochs = {args.num_train_epochs}")
+    logger.info(f"  len_dataloader = {len(train_loader)}")
+    logger.info(
+        f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
+    )
+    logger.info(
+        f"  Total train batch size (w. parallel, distributed & accumulation) = {args.batch_size}"
+    )
+    logger.info(f"  Gradient Accumulation steps = {gradient_accumulation_steps}")
+    logger.info(f"  Total optimization steps = {args.max_train_steps}")
+    logger.info(f"  Log steps number = {len(log_steps)}")
+
     completed_steps = 0
     total_loss = 0
     start = time.time()
@@ -824,7 +820,10 @@ def main():
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
                 completed_steps += 1
-                if completed_steps in eval_steps:
+                if completed_steps in log_steps:
+                    accelerator.print(f"log step: {completed_steps}/{log_steps[-1]}")
+                    sys.stdout.flush()
+
                     t_tot = time.time() - start
 
                     avg_loss = (
@@ -833,12 +832,13 @@ def main():
                         / args.eval_steps
                     )
                     logger.info(
-                        f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
+                        f"LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
                     )
                     print_memory_consumed(rank=RANK)
                     sys.stdout.flush()
                     total_loss = 0
 
+                if completed_steps in eval_steps:
                     meter.update(
                         accelerator=accelerator,
                         model=model,
@@ -979,13 +979,21 @@ def get_cpt_steps(nsteps, max_train_steps, logspace=True):
             )
         )
     else:
-        steps = np.unique(
-            np.around(
-                np.linspace(0, max_train_steps, nsteps, endpoint=False)[1:]
-            ).astype(int)
-        )
+        step = int(np.around(max_train_steps / nsteps))
+        steps = np.arange(0, max_train_steps, step)
+        # steps = np.unique(
+        #     np.around(
+        #         np.linspace(0, max_train_steps, nsteps, endpoint=False)[1:]
+        #     ).astype(int)
+        # )
 
     return steps
+
+
+steps = np.unique(np.around(np.linspace(0, 180, 100, endpoint=False)[1:]).astype(int))
+
+
+get_cpt_steps(100, 180, logspace=False)
 
 
 class measure_statistics:
