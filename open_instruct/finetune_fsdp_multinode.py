@@ -647,8 +647,6 @@ def main():
 
     # should be done after wrapping the model in FSDP
     if args.activation_checkpointing:
-        accelerator.print(model)
-        sys.stdout.flush()
         from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
             checkpoint_wrapper,
             CheckpointImpl,
@@ -665,9 +663,6 @@ def main():
         apply_activation_checkpointing(
             model, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=check_fn
         )
-        accelerator.print(model)
-        sys.stdout.flush()
-
     # optimizer = get_optimizer(
     #    model=model,
     #    learning_rate=args.learning_rate,
