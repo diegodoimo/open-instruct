@@ -256,7 +256,7 @@ def parse_args():
     parser.add_argument(
         "--logging_steps",
         type=int,
-        default=100,
+        default=50,
         help="Log the training loss and learning rate every logging_steps steps.",
     )
     parser.add_argument(
@@ -770,7 +770,7 @@ def main():
     if args.measure_baselines:
         accelerator.print("measuring baselines..")
         sys.stdout.flush()
-        
+
         meter.update(
             accelerator=accelerator,
             model=model,
@@ -812,16 +812,16 @@ def main():
         for _, batch in enumerate(train_loader):
             with accelerator.accumulate(model):
 
-                outputs = model(**batch, use_cache=False)
-                loss = outputs.loss
-                # We keep track of the loss at each logged step
-                total_loss += loss.detach().float()
-                accelerator.backward(loss)
-                # clip gradient norm. don't do this with deepspeed
-                if accelerator.sync_gradients and args.clip_grad_norm > 0:
-                    accelerator.clip_grad_norm_(model.parameters(), args.clip_grad_norm)
-                optimizer.step()
-                optimizer.zero_grad()
+                # outputs = model(**batch, use_cache=False)
+                # loss = outputs.loss
+                # # We keep track of the loss at each logged step
+                # total_loss += loss.detach().float()
+                # accelerator.backward(loss)
+                # # clip gradient norm. don't do this with deepspeed
+                # if accelerator.sync_gradients and args.clip_grad_norm > 0:
+                #     accelerator.clip_grad_norm_(model.parameters(), args.clip_grad_norm)
+                # optimizer.step()
+                # optimizer.zero_grad()
                 lr_scheduler.step()
 
             # Checks if the accelerator has performed an optimization step behind the scenes
@@ -838,7 +838,10 @@ def main():
                         / gradient_accumulation_steps
                         / args.eval_steps
                     )
-                    logger.info(
+                    assert (
+                        lr_scheduler.get_last_lr()[0] == optimizer.param_groups[0]["lr"]
+                    )
+                    accelerator.print(
                         f"LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
                     )
                     print_memory_consumed(rank=RANK)
@@ -892,13 +895,13 @@ def main():
 # FSDP has issues with `inference_mode`
 # @torch.inference_mode()
 @torch.no_grad()
-def evaluate(model, dataloader, tokenizer, restrict_targets):
+def evaluate(model, dataloader, tokenizer):
     model.eval()
 
     predictions, ground_truths = [], []
 
     for iter_num, batch in enumerate(dataloader):
-        if (iter_num + 1) % int(1000 / dataloader.batch_size) == 0:
+        if (iter_num + 1) % int(1000 / dataloader.batch_size) == 0 and RANK == 0:
             print(
                 f"{iter_num * dataloader.batch_size+1}/ {len(dataloader.dataset)} inputs processed"
             )
@@ -933,8 +936,6 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         predictions = torch.cat(pred_list, dim=0).cpu()
         ground_truths = torch.cat(gt_list, dim=0).cpu()
 
-    # ground_truths = tokenizer.batch_decode(targets, skip_special_tokens=True)
-    # predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     ground_truths = np.array([tokenizer.decode(tg).strip() for tg in ground_truths])
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
 
@@ -987,19 +988,8 @@ def get_cpt_steps(nsteps, max_train_steps, logspace=True):
     else:
         step = int(np.around(max_train_steps / nsteps))
         steps = np.arange(0, max_train_steps, step)
-        # steps = np.unique(
-        #     np.around(
-        #         np.linspace(0, max_train_steps, nsteps, endpoint=False)[1:]
-        #     ).astype(int)
-        # )
 
     return steps
-
-
-steps = np.unique(np.around(np.linspace(0, 180, 100, endpoint=False)[1:]).astype(int))
-
-
-get_cpt_steps(100, 180, logspace=False)
 
 
 class measure_statistics:
@@ -1092,7 +1082,7 @@ class measure_statistics:
             self.train_stats["loss"][completed_steps] = loss
 
         if do_val:
-            accelerator.print("mesuering validation accuracy")
+            accelerator.print("measuring validation accuracy")
             sys.stdout.flush()
             acc = evaluate(
                 model=model,
