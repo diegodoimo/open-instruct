@@ -476,7 +476,7 @@ def main():
         model_name_or_path=args.model_name_or_path,
         low_cpu_mem_usage=args.low_cpu_mem_usage,
         precision=torch.bfloat16,
-        use_flash_attention_2=False,
+        use_flash_attention_2=args.use_flash_attn,
     )
 
     if args.use_lora:
@@ -645,6 +645,7 @@ def main():
     print_memory_consumed(rank=RANK)
     sys.stdout.flush()
 
+    # should be done after wrapping the model in FSDP
     if args.activation_checkpointing:
         accelerator.print(model)
         sys.stdout.flush()
@@ -907,8 +908,9 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
         # we alredy select the last one here
         # logits, targets = all_gather_logits(logits, targets, seq_len)
+        
 
-        last_logits = logits[torch.arange(logits.shape[0]), torch.tensor(seq_len) - 1]
+        last_logits = logits[torch.arange(logits.shape[0]), seq_len - 1]
 
         predictions.extend(torch.argmax(last_logits, dim=-1, keepdims=True))
         ground_truths.extend(targets)
