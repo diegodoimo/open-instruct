@@ -656,11 +656,11 @@ def main():
         )
 
         check_fn = lambda submodule: isinstance(submodule, LlamaDecoderLayer)
-        #non_reentrant_wrapper = partial(
-        #checkpoint_wrapper,
-         #   offload_to_cpu=False,
-         #   checkpoint_impl=CheckpointImpl.NO_REENTRANT,
-        #)
+        # non_reentrant_wrapper = partial(
+        # checkpoint_wrapper,
+        #   offload_to_cpu=False,
+        #   checkpoint_impl=CheckpointImpl.NO_REENTRANT,
+        # )
         non_reentrant_wrapper = partial(
             checkpoint_wrapper,
             checkpoint_impl=CheckpointImpl.NO_REENTRANT,
@@ -734,14 +734,11 @@ def main():
     if args.out_filename != "":
         filename = "_" + args.out_filename
 
-    
-
     eval_steps = get_cpt_steps(args.eval_steps, args.max_train_steps, logspace=False)
     checkpointing_steps = get_cpt_steps(
         args.checkpointing_steps, args.max_train_steps, logspace=False
     )
     log_steps = get_cpt_steps(args.logging_steps, args.max_train_steps, logspace=False)
-
 
     stats = defaultdict()
     stats["num_epochs"] = args.num_train_epochs
@@ -918,7 +915,6 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
         # we alredy select the last one here
         # logits, targets = all_gather_logits(logits, targets, seq_len)
-        
 
         last_logits = logits[torch.arange(logits.shape[0]), seq_len - 1]
 
