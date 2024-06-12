@@ -647,6 +647,8 @@ def main():
 
     # should be done after wrapping the model in FSDP
     if args.activation_checkpointing:
+        accelerator.print("preparing checkpoints..")
+        sys.stdout.flush()
         from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
             checkpoint_wrapper,
             CheckpointImpl,
@@ -686,6 +688,8 @@ def main():
     # ]
 
     # model must be alredy prepared here!
+    accelerator.print("setup scheduler and optimizer..")
+    sys.stdout.flush()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
 
     lr_scheduler = get_scheduler(
@@ -703,6 +707,8 @@ def main():
     # we already setup the dataloader for distributed training
     optimizer, lr_scheduler = accelerator.prepare(optimizer, lr_scheduler)
 
+    accelerator.print("final setup steps..")
+    sys.stdout.flush()
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
         len(train_loader) / gradient_accumulation_steps
@@ -757,12 +763,17 @@ def main():
     )
 
     # save pretrained model for double check
+    accelerator.print("saving pretrained model at initialization..")
+    sys.stdout.flush()
     output_dir = f"epoch_0"
     if args.output_dir is not None:
         output_dir = os.path.join(args.output_dir, output_dir)
     save_with_accelerate(accelerator, model, output_dir, args)
 
     if args.measure_baselines:
+        accelerator.print("measuring baselines..")
+        sys.stdout.flush()
+        
         meter.update(
             accelerator=accelerator,
             model=model,
@@ -1085,6 +1096,8 @@ class measure_statistics:
             self.train_stats["loss"][completed_steps] = loss
 
         if do_val:
+            accelerator.print("overlap computation started")
+            sys.stdout.flush()
             acc = evaluate(
                 model=model,
                 dataloader=self.val_loader,
@@ -1095,6 +1108,8 @@ class measure_statistics:
             self.train_stats["mmlu_val"][completed_steps] = acc
 
         if do_test:
+            accelerator.print("overlap computation started")
+            sys.stdout.flush()
             acc = evaluate(
                 model=model,
                 dataloader=self.test_loader,
