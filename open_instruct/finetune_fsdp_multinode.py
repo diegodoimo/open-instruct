@@ -636,39 +636,39 @@ def main():
 
     # Prepare everything with `accelerator` model must be prepared before givin it to the optimizer.
     # maybe shold be called after the preparation
-    # model.gradient_checkpointing_enable()
-    accelerator.print("memory consumed before loading model")
-    print_memory_consumed(rank=RANK)
-    sys.stdout.flush()
-    model = accelerator.prepare(model)
-    accelerator.print("memory consumed after loading model")
-    print_memory_consumed(rank=RANK)
-    sys.stdout.flush()
 
-    # should be done after wrapping the model in FSDP
-    if args.activation_checkpointing:
-        accelerator.print("preparing checkpoints..")
-        sys.stdout.flush()
-        from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
-            checkpoint_wrapper,
-            CheckpointImpl,
-            apply_activation_checkpointing,
-        )
+    # accelerator.print("memory consumed before loading model")
+    # print_memory_consumed(rank=RANK)
+    # sys.stdout.flush()
+    # model = accelerator.prepare(model)
+    # accelerator.print("memory consumed after loading model")
+    # print_memory_consumed(rank=RANK)
+    # sys.stdout.flush()
 
-        check_fn = lambda submodule: isinstance(submodule, LlamaDecoderLayer)
-        # non_reentrant_wrapper = partial(
-        # checkpoint_wrapper,
-        #   offload_to_cpu=False,
-        #   checkpoint_impl=CheckpointImpl.NO_REENTRANT,
-        # )
-        non_reentrant_wrapper = partial(
-            checkpoint_wrapper,
-            checkpoint_impl=CheckpointImpl.NO_REENTRANT,
-        )
+    # # should be done after wrapping the model in FSDP
+    # if args.activation_checkpointing:
+    #     accelerator.print("preparing checkpoints..")
+    #     sys.stdout.flush()
+    #     from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
+    #         checkpoint_wrapper,
+    #         CheckpointImpl,
+    #         apply_activation_checkpointing,
+    #     )
 
-        apply_activation_checkpointing(
-            model, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=check_fn
-        )
+    #     check_fn = lambda submodule: isinstance(submodule, LlamaDecoderLayer)
+    #     # non_reentrant_wrapper = partial(
+    #     # checkpoint_wrapper,
+    #     #   offload_to_cpu=False,
+    #     #   checkpoint_impl=CheckpointImpl.NO_REENTRANT,
+    #     # )
+    #     non_reentrant_wrapper = partial(
+    #         checkpoint_wrapper,
+    #         checkpoint_impl=CheckpointImpl.NO_REENTRANT,
+    #     )
+
+    #     apply_activation_checkpointing(
+    #         model, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=check_fn
+    #     )
     # optimizer = get_optimizer(
     #    model=model,
     #    learning_rate=args.learning_rate,
