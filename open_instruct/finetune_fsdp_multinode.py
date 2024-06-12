@@ -733,6 +733,15 @@ def main():
     if args.out_filename != "":
         filename = "_" + args.out_filename
 
+    
+
+    eval_steps = get_cpt_steps(args.eval_steps, args.max_train_steps, logspace=False)
+    checkpointing_steps = get_cpt_steps(
+        args.checkpointing_steps, args.max_train_steps, logspace=False
+    )
+    log_steps = get_cpt_steps(args.logging_steps, args.max_train_steps, logspace=False)
+
+
     stats = defaultdict()
     stats["num_epochs"] = args.num_train_epochs
     stats["lr"] = args.learning_rate
@@ -765,7 +774,7 @@ def main():
             completed_steps=0,
             epoch=0,
             do_overlap=args.measure_overlap,
-            do_val=True,
+            do_val=False,
             do_test=WORLD_SIZE == 1,
         )
 
@@ -774,11 +783,6 @@ def main():
     accelerator.print("memory before train run")
     sys.stdout.flush()
 
-    eval_steps = get_cpt_steps(args.eval_steps, args.max_train_steps, logspace=False)
-    checkpointing_steps = get_cpt_steps(
-        args.checkpoint_steps, args.max_train_steps, logspace=False
-    )
-    log_steps = get_cpt_steps(args.logging_steps, args.max_train_steps, logspace=False)
     # *******************************************************************************
 
     logger.info("***** Running training *****")
