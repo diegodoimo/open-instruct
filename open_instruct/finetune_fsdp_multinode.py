@@ -347,11 +347,12 @@ def parse_args():
         type=int,
         default=None,
     )
-
     parser.add_argument(
         "--activation_checkpointing",
         action="store_true",
     )
+
+    parser.add_argument("--clip_grad_thresh", type=float, default=1.0)
 
     parser.add_argument("--overlap_base_dir", type=str, default=None, help="")
     parser.add_argument("--save_checkpoint", action="store_true")
@@ -637,38 +638,38 @@ def main():
     # Prepare everything with `accelerator` model must be prepared before givin it to the optimizer.
     # maybe shold be called after the preparation
 
-    # accelerator.print("memory consumed before loading model")
-    # print_memory_consumed(rank=RANK)
-    # sys.stdout.flush()
-    # model = accelerator.prepare(model)
-    # accelerator.print("memory consumed after loading model")
-    # print_memory_consumed(rank=RANK)
-    # sys.stdout.flush()
+    accelerator.print("memory consumed before loading model")
+    print_memory_consumed(rank=RANK)
+    sys.stdout.flush()
+    model = accelerator.prepare(model)
+    accelerator.print("memory consumed after loading model")
+    print_memory_consumed(rank=RANK)
+    sys.stdout.flush()
 
-    # # should be done after wrapping the model in FSDP
-    # if args.activation_checkpointing:
-    #     accelerator.print("preparing checkpoints..")
-    #     sys.stdout.flush()
-    #     from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
-    #         checkpoint_wrapper,
-    #         CheckpointImpl,
-    #         apply_activation_checkpointing,
-    #     )
+    # should be done after wrapping the model in FSDP
+    if args.activation_checkpointing:
+        accelerator.print("preparing checkpoints..")
+        sys.stdout.flush()
+        from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
+            checkpoint_wrapper,
+            CheckpointImpl,
+            apply_activation_checkpointing,
+        )
 
-    #     check_fn = lambda submodule: isinstance(submodule, LlamaDecoderLayer)
-    #     # non_reentrant_wrapper = partial(
-    #     # checkpoint_wrapper,
-    #     #   offload_to_cpu=False,
-    #     #   checkpoint_impl=CheckpointImpl.NO_REENTRANT,
-    #     # )
-    #     non_reentrant_wrapper = partial(
-    #         checkpoint_wrapper,
-    #         checkpoint_impl=CheckpointImpl.NO_REENTRANT,
-    #     )
+        check_fn = lambda submodule: isinstance(submodule, LlamaDecoderLayer)
+        # non_reentrant_wrapper = partial(
+        # checkpoint_wrapper,
+        #   offload_to_cpu=False,
+        #   checkpoint_impl=CheckpointImpl.NO_REENTRANT,
+        # )
+        non_reentrant_wrapper = partial(
+            checkpoint_wrapper,
+            checkpoint_impl=CheckpointImpl.NO_REENTRANT,
+        )
 
-    #     apply_activation_checkpointing(
-    #         model, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=check_fn
-    #     )
+        apply_activation_checkpointing(
+            model, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=check_fn
+        )
     # optimizer = get_optimizer(
     #    model=model,
     #    learning_rate=args.learning_rate,
@@ -734,11 +735,13 @@ def main():
     if args.out_filename != "":
         filename = "_" + args.out_filename
 
-    eval_steps = get_cpt_steps(args.eval_steps, args.max_train_steps, logspace=False)
-    checkpointing_steps = get_cpt_steps(
+    eval_steps, _ = get_cpt_steps(args.eval_steps, args.max_train_steps, logspace=False)
+    checkpointing_steps, _ = get_cpt_steps(
         args.checkpointing_steps, args.max_train_steps, logspace=False
     )
-    log_steps = get_cpt_steps(args.logging_steps, args.max_train_steps, logspace=False)
+    log_steps, log_interval = get_cpt_steps(
+        args.logging_steps, args.max_train_steps, logspace=False
+    )
 
     stats = defaultdict()
     stats["num_epochs"] = args.num_train_epochs
@@ -809,35 +812,94 @@ def main():
 
         model.train()
 
-        for _, batch in enumerate(train_loader):
-            with accelerator.accumulate(model):
+        for index, batch in enumerate(train_loader):
 
-                # outputs = model(**batch, use_cache=False)
-                # loss = outputs.loss
-                # # We keep track of the loss at each logged step
-                # total_loss += loss.detach().float()
-                # accelerator.backward(loss)
-                # # clip gradient norm. don't do this with deepspeed
-                # if accelerator.sync_gradients and args.clip_grad_norm > 0:
-                #     accelerator.clip_grad_norm_(model.parameters(), args.clip_grad_norm)
-                # optimizer.step()
-                # optimizer.zero_grad()
-                lr_scheduler.step()
+            if WORLD_SIZE == 1:
+                # NO FSDP
+                batch = {key: val.to("cuda") for key, val in batch}
+                outputs = model(**batch, use_cache=False)
+                loss = outputs.loss
+                loss = loss / gradient_accumulation_steps
+                loss.backward()
+                total_loss += loss.detach().float()
+
+                if (index + 1) % gradient_accumulation_steps == 0:
+                    torch.nn.utils.clip_grad_norm_(
+                        model.parameters(), args.clip_grad_thresh
+                    )
+                    optimizer.step()
+                    lr_scheduler.step()
+                    optimizer.zero_grad()
+            else:
+
+                if (index + 1) % gradient_accumulation_steps == 0:
+                    # # fsdp wrapper automatically puts the tensor to gpu device
+                    # outputs = model(**batch, use_cache=False)
+                    # loss = outputs.loss
+                    # loss = loss / gradient_accumulation_steps
+                    # loss.backward()
+                    # total_loss += loss.detach().float()
+
+                    # # gradient clipping must take into acocunt the fsdp wrapping
+                    # model.clip_grad_norm_(args.clip_grad_thresh)
+                    # # parameter update
+                    # optimizer.step()
+                    # optimizer.zero_grad()
+                    lr_scheduler.step()
+
+                else:
+                    pass
+                    # # FSDP NO SYNC FUNCTION we do not need to compute gradients
+                    # with model.no_sync():
+                    #     # 1 forward and 1 backward must be inside the context manager
+                    #     outputs = model(**batch, use_cache=False)
+                    #     loss = outputs.loss
+                    #     loss = loss / gradient_accumulation_steps
+                    #     loss.backward()
+                    #     total_loss += loss.detach().float()
+
+            # with accelerator.accumulate(model):
+            #     outputs = model(**batch, use_cache=False)
+            #     loss = outputs.loss
+            #     # We keep track of the loss at each logged step
+            #     total_loss += loss.detach().float()
+            #     accelerator.backward(loss)
+            #     # clip gradient norm. don't do this with deepspeed
+            #     if accelerator.sync_gradients and args.clip_grad_norm > 0:
+            #         accelerator.clip_grad_norm_(model.parameters(), args.clip_grad_norm)
+            #     optimizer.step()
+            #     lr_scheduler.step()
+            #     optimizer.zero_grad()
 
             # Checks if the accelerator has performed an optimization step behind the scenes
-            if accelerator.sync_gradients:
+            # if accelerator.sync_gradients:
+            if (index + 1) % gradient_accumulation_steps == 0:
                 completed_steps += 1
                 if completed_steps in log_steps:
                     accelerator.print(f"log step: {completed_steps}/{log_steps[-1]}")
                     sys.stdout.flush()
-
                     t_tot = time.time() - start
 
-                    avg_loss = (
-                        accelerator.gather(total_loss).mean().item()
-                        / gradient_accumulation_steps
-                        / args.eval_steps
-                    )
+                    # if WORLD_SIZE > 1:
+                    #     avg_loss = [
+                    #         torch.zeros_like(total_loss) for _ in range(WORLD_SIZE)
+                    #     ]
+                    #     dist.all_gather(avg_loss, total_loss)
+                    #     avg_loss = (
+                    #         torch.cat(avg_loss).mean().item()
+                    #         / gradient_accumulation_steps
+                    #         / log_interval
+                    #     )
+                    # else:
+                    #     avg_loss = (
+                    #         avg_loss.item() / gradient_accumulation_steps / log_interval
+                    #     )
+                    # avg_loss = (
+                    #     accelerator.gather(total_loss).mean().item()
+                    #     / gradient_accumulation_steps
+                    #     / log_interval
+                    # )
+                    avg_loss = -1
                     assert (
                         lr_scheduler.get_last_lr()[0] == optimizer.param_groups[0]["lr"]
                     )
@@ -848,48 +910,48 @@ def main():
                     sys.stdout.flush()
                     total_loss = 0
 
-                if completed_steps in eval_steps:
-                    meter.update(
-                        accelerator=accelerator,
-                        model=model,
-                        loss=avg_loss,
-                        completed_steps=completed_steps,
-                        epoch=epoch,
-                        do_val=True,
-                        do_overlap=args.measure_overlap,
-                    )
+    #             if completed_steps in eval_steps:
+    #                 meter.update(
+    #                     accelerator=accelerator,
+    #                     model=model,
+    #                     loss=avg_loss,
+    #                     completed_steps=completed_steps,
+    #                     epoch=epoch,
+    #                     do_val=True,
+    #                     do_overlap=args.measure_overlap,
+    #                 )
 
-                if completed_steps in checkpointing_steps and args.save_checkpoint:
-                    accelerator.print("saving checkpoint")
-                    sys.stdout.flush()
-                    output_dir = (
-                        f"{len(checkpointing_steps)}ckpts/step_{completed_steps}"
-                    )
-                    if args.output_dir is not None:
-                        output_dir = os.path.join(args.output_dir, output_dir)
-                    save_with_accelerate(accelerator, model, output_dir, args)
+    #             if completed_steps in checkpointing_steps and args.save_checkpoint:
+    #                 accelerator.print("saving checkpoint")
+    #                 sys.stdout.flush()
+    #                 output_dir = (
+    #                     f"{len(checkpointing_steps)}ckpts/step_{completed_steps}"
+    #                 )
+    #                 if args.output_dir is not None:
+    #                     output_dir = os.path.join(args.output_dir, output_dir)
+    #                 save_with_accelerate(accelerator, model, output_dir, args)
 
-                if completed_steps >= args.max_train_steps:
-                    break
+    #             if completed_steps >= args.max_train_steps:
+    #                 break
 
-        meter.update(
-            accelerator=accelerator,
-            model=model,
-            completed_steps=completed_steps,
-            epoch=epoch,
-            do_test=True,
-            do_overlap=args.measure_overlap,
-        )
-        print_memory_consumed(rank=RANK)
+    #     meter.update(
+    #         accelerator=accelerator,
+    #         model=model,
+    #         completed_steps=completed_steps,
+    #         epoch=epoch,
+    #         do_test=True,
+    #         do_overlap=args.measure_overlap,
+    #     )
+    #     print_memory_consumed(rank=RANK)
 
-        # save model
-        output_dir = f"epoch_{epoch+1}"
-        if args.output_dir is not None:
-            output_dir = os.path.join(args.output_dir, output_dir)
-        save_with_accelerate(accelerator, model, output_dir, args)
+    #     # save model
+    #     output_dir = f"epoch_{epoch+1}"
+    #     if args.output_dir is not None:
+    #         output_dir = os.path.join(args.output_dir, output_dir)
+    #     save_with_accelerate(accelerator, model, output_dir, args)
 
-    if args.with_tracking:
-        accelerator.end_training()
+    # if args.with_tracking:
+    #     accelerator.end_training()
 
 
 # FSDP has issues with `inference_mode`
@@ -985,11 +1047,12 @@ def get_cpt_steps(nsteps, max_train_steps, logspace=True):
                 int
             )
         )
+        step = None
     else:
         step = int(np.around(max_train_steps / nsteps))
         steps = np.arange(0, max_train_steps, step)
 
-    return steps
+    return steps, step
 
 
 class measure_statistics:
