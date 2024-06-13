@@ -847,7 +847,7 @@ def main():
                     lr_scheduler.step()
                     optimizer.zero_grad()
                 else:
-                    # FSDP NO SYNC FUNCTION we do not need to compute gradients
+                    # FSDP NO SYNC FUNCTION we do not need to compute gradients!
                     with model.no_sync():
                         # 1 forward and 1 backward must be inside the context manager
                         outputs = model(**batch, use_cache=False)
