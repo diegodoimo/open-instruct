@@ -833,28 +833,30 @@ def main():
             else:
 
                 if (index + 1) % gradient_accumulation_steps == 0:
-                    # fsdp wrapper automatically puts the tensor to gpu device
-                    outputs = model(**batch, use_cache=False)
-                    loss = outputs.loss
-                    loss = loss / gradient_accumulation_steps
-                    loss.backward()
-                    total_loss += loss.detach().float()
+                    # # fsdp wrapper automatically puts the tensor to gpu device
+                    # outputs = model(**batch, use_cache=False)
+                    # loss = outputs.loss
+                    # loss = loss / gradient_accumulation_steps
+                    # loss.backward()
+                    # total_loss += loss.detach().float()
 
-                    # gradient clipping must take into acocunt the fsdp wrapping
-                    model.clip_grad_norm_(args.clip_grad_thresh)
-                    # parameter update
-                    optimizer.step()
+                    # # gradient clipping must take into acocunt the fsdp wrapping
+                    # model.clip_grad_norm_(args.clip_grad_thresh)
+                    # # parameter update
+                    # optimizer.step()
+                    # optimizer.zero_grad()
                     lr_scheduler.step()
-                    optimizer.zero_grad()
+
                 else:
-                    # FSDP NO SYNC FUNCTION we do not need to compute gradients!
-                    with model.no_sync():
-                        # 1 forward and 1 backward must be inside the context manager
-                        outputs = model(**batch, use_cache=False)
-                        loss = outputs.loss
-                        loss = loss / gradient_accumulation_steps
-                        loss.backward()
-                        total_loss += loss.detach().float()
+                    pass
+                    # # FSDP NO SYNC FUNCTION we do not need to compute gradients
+                    # with model.no_sync():
+                    #     # 1 forward and 1 backward must be inside the context manager
+                    #     outputs = model(**batch, use_cache=False)
+                    #     loss = outputs.loss
+                    #     loss = loss / gradient_accumulation_steps
+                    #     loss.backward()
+                    #     total_loss += loss.detach().float()
 
             # with accelerator.accumulate(model):
             #     outputs = model(**batch, use_cache=False)
@@ -878,25 +880,26 @@ def main():
                     sys.stdout.flush()
                     t_tot = time.time() - start
 
-                    if WORLD_SIZE > 1:
-                        avg_loss = [
-                            torch.zeros_like(total_loss) for _ in range(WORLD_SIZE)
-                        ]
-                        dist.all_gather(avg_loss, total_loss)
-                        avg_loss = (
-                            torch.cat(avg_loss).mean().item()
-                            / gradient_accumulation_steps
-                            / log_interval
-                        )
-                    else:
-                        avg_loss = (
-                            avg_loss.item() / gradient_accumulation_steps / log_interval
-                        )
+                    # if WORLD_SIZE > 1:
+                    #     avg_loss = [
+                    #         torch.zeros_like(total_loss) for _ in range(WORLD_SIZE)
+                    #     ]
+                    #     dist.all_gather(avg_loss, total_loss)
+                    #     avg_loss = (
+                    #         torch.cat(avg_loss).mean().item()
+                    #         / gradient_accumulation_steps
+                    #         / log_interval
+                    #     )
+                    # else:
+                    #     avg_loss = (
+                    #         avg_loss.item() / gradient_accumulation_steps / log_interval
+                    #     )
                     # avg_loss = (
                     #     accelerator.gather(total_loss).mean().item()
                     #     / gradient_accumulation_steps
                     #     / log_interval
                     # )
+                    avg_loss = -1
                     assert (
                         lr_scheduler.get_last_lr()[0] == optimizer.param_groups[0]["lr"]
                     )
@@ -907,48 +910,48 @@ def main():
                     sys.stdout.flush()
                     total_loss = 0
 
-                if completed_steps in eval_steps:
-                    meter.update(
-                        accelerator=accelerator,
-                        model=model,
-                        loss=avg_loss,
-                        completed_steps=completed_steps,
-                        epoch=epoch,
-                        do_val=True,
-                        do_overlap=args.measure_overlap,
-                    )
+    #             if completed_steps in eval_steps:
+    #                 meter.update(
+    #                     accelerator=accelerator,
+    #                     model=model,
+    #                     loss=avg_loss,
+    #                     completed_steps=completed_steps,
+    #                     epoch=epoch,
+    #                     do_val=True,
+    #                     do_overlap=args.measure_overlap,
+    #                 )
 
-                if completed_steps in checkpointing_steps and args.save_checkpoint:
-                    accelerator.print("saving checkpoint")
-                    sys.stdout.flush()
-                    output_dir = (
-                        f"{len(checkpointing_steps)}ckpts/step_{completed_steps}"
-                    )
-                    if args.output_dir is not None:
-                        output_dir = os.path.join(args.output_dir, output_dir)
-                    save_with_accelerate(accelerator, model, output_dir, args)
+    #             if completed_steps in checkpointing_steps and args.save_checkpoint:
+    #                 accelerator.print("saving checkpoint")
+    #                 sys.stdout.flush()
+    #                 output_dir = (
+    #                     f"{len(checkpointing_steps)}ckpts/step_{completed_steps}"
+    #                 )
+    #                 if args.output_dir is not None:
+    #                     output_dir = os.path.join(args.output_dir, output_dir)
+    #                 save_with_accelerate(accelerator, model, output_dir, args)
 
-                if completed_steps >= args.max_train_steps:
-                    break
+    #             if completed_steps >= args.max_train_steps:
+    #                 break
 
-        meter.update(
-            accelerator=accelerator,
-            model=model,
-            completed_steps=completed_steps,
-            epoch=epoch,
-            do_test=True,
-            do_overlap=args.measure_overlap,
-        )
-        print_memory_consumed(rank=RANK)
+    #     meter.update(
+    #         accelerator=accelerator,
+    #         model=model,
+    #         completed_steps=completed_steps,
+    #         epoch=epoch,
+    #         do_test=True,
+    #         do_overlap=args.measure_overlap,
+    #     )
+    #     print_memory_consumed(rank=RANK)
 
-        # save model
-        output_dir = f"epoch_{epoch+1}"
-        if args.output_dir is not None:
-            output_dir = os.path.join(args.output_dir, output_dir)
-        save_with_accelerate(accelerator, model, output_dir, args)
+    #     # save model
+    #     output_dir = f"epoch_{epoch+1}"
+    #     if args.output_dir is not None:
+    #         output_dir = os.path.join(args.output_dir, output_dir)
+    #     save_with_accelerate(accelerator, model, output_dir, args)
 
-    if args.with_tracking:
-        accelerator.end_training()
+    # if args.with_tracking:
+    #     accelerator.end_training()
 
 
 # FSDP has issues with `inference_mode`
