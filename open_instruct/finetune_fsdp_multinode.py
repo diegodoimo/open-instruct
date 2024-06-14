@@ -766,7 +766,7 @@ def main():
     output_dir = f"epoch_0"
     if args.output_dir is not None:
         output_dir = os.path.join(args.output_dir, output_dir)
-    save_with_accelerate(accelerator, model, output_dir, args)
+    #save_with_accelerate(accelerator, model, output_dir, args)
 
     if args.measure_baselines:
         accelerator.print("measuring baselines..")
