@@ -894,7 +894,6 @@ def main():
                             torch.zeros_like(total_loss) for _ in range(WORLD_SIZE)
                         ]
                         dist.all_gather(avg_loss, total_loss)
-                        print(f"{RANK}", avg_loss)
                         avg_loss = (
                             torch.cat(avg_loss).mean().item()
                             / gradient_accumulation_steps
@@ -902,14 +901,15 @@ def main():
                         )
                     else:
                         avg_loss = (
-                            total_loss.item() / gradient_accumulation_steps / log_interval
+                            total_loss.item()
+                            / gradient_accumulation_steps
+                            / log_interval
                         )
                     # avg_loss = (
                     #     accelerator.gather(total_loss).mean().item()
                     #     / gradient_accumulation_steps
                     #     / log_interval
                     # )
-                    # avg_loss = -1
 
                     accelerator.print(
                         f"LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot//3600: .2f} h {(t_tot%3600)/60: .2f} min"
