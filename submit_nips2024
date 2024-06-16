@@ -56,7 +56,7 @@ accelerate launch \
     --warmup_ratio 0.05 \
     --weight_decay 0. \
     --num_train_epochs 4 \
-    --output_dir ./results/${model_name}/ \
+    --output_dir ./results/post_nips2024_tests/${model_name}/ \
     --measure_baselines \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
     --samples_per_subject 20 \
