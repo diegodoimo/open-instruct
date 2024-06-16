@@ -10,6 +10,7 @@ import torch
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import set_seed
+from torch.optim.lr_scheduler import LambdaLR
 
 import transformers
 from transformers import (
@@ -623,7 +624,6 @@ def main():
 
     # *******************************************************************************
 
-    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(
         len(train_loader) / gradient_accumulation_steps
     )
@@ -631,7 +631,7 @@ def main():
     args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
 
     # Afterwards we recalculate our number of training epochs
-    args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
+    # args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
     # Prepare everything with `accelerator` model must be prepared before givin it to the optimizer.
     # maybe shold be called after the preparation
@@ -691,32 +691,46 @@ def main():
     sys.stdout.flush()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
 
-    lr_scheduler = get_scheduler(
-        args.lr_scheduler_type,
-        optimizer,
-        epochs=args.num_train_epochs,
-        num_iters=len(train_loader),
-        warmup_steps=args.warmup_steps,
-        warmup_ratio=args.warmup_ratio,
-        gradient_accumulation_iters=gradient_accumulation_steps,
+    if warmup_steps is None and args.warmup_ratio is None:
+        warmup_steps = 0
+    elif warmup_steps is None:
+        warmup_steps = args.warmup_ratio * args.max_train_stepss
+
+    scheduler = lambda x: min(
+        1 - (1 - min(x, warmup_steps) / warmup_steps),
+        0.1
+        + 0.5
+        * (1 - 0.1)
+        * (1 + math.cos(min(x, args.max_train_steps) / args.max_train_steps * math.pi)),
     )
+    lr_scheduler = LambdaLR(optimizer, lambda x: scheduler(x))
+
+    # lr_scheduler = get_scheduler(
+    #     args.lr_scheduler_type,
+    #     optimizer,
+    #     epochs=args.num_train_epochs,
+    #     num_iters=len(train_loader),
+    #     warmup_steps=args.warmup_steps,
+    #     warmup_ratio=args.warmup_ratio,
+    #     gradient_accumulation_iters=gradient_accumulation_steps,
+    # )
 
     # ************************************************************************
     # model must be prepared before initializing th optimizer
-    # we already setup the dataloader for distributed training
-    optimizer, lr_scheduler = accelerator.prepare(optimizer, lr_scheduler)
+    # for the optimizer and lr the accelerator. prepare is needed to skip the update inside accclerator.accumulate, otherwise is not needed
 
-    accelerator.print("final setup steps..")
-    sys.stdout.flush()
-    # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(
-        len(train_loader) / gradient_accumulation_steps
-    )
+    # optimizer, lr_scheduler = accelerator.prepare(optimizer, lr_scheduler)
 
-    args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
+    # accelerator.print("final setup steps..")
+    # sys.stdout.flush()
+    # num_update_steps_per_epoch = math.ceil(
+    #     len(train_loader) / gradient_accumulation_steps
+    # )
+
+    # args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
 
     # Afterwards we recalculate our number of training epochs
-    args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
+    # args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
     # We need to initialize the trackers we use, and also store our configuration.
     # The trackers initializes automatically on the main process.

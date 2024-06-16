@@ -64,17 +64,17 @@ def get_scheduler(
 
     # Scheduler and math around the number of training steps.
     num_update_steps_per_epoch = math.ceil(num_iters / gradient_accumulation_iters)
-    num_training_steps_for_scheduler = epochs * num_update_steps_per_epoch
+    num_training_steps = epochs * num_update_steps_per_epoch
 
     if warmup_steps is None and warmup_ratio is None:
         warmup_steps = 0
     elif warmup_steps is None:
-        warmup_steps = int(warmup_ratio * num_training_steps_for_scheduler)
+        warmup_steps = warmup_ratio * num_training_steps
 
     scheduler = get_scheduler_hf(
         name=lr_scheduler_type,
         optimizer=optimizer,
-        num_training_steps=num_training_steps_for_scheduler,
+        num_training_steps=num_training_steps,
         num_warmup_steps=warmup_steps,
     )
     return scheduler
