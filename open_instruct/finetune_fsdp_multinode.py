@@ -761,6 +761,7 @@ def main():
     log_steps, log_interval = get_cpt_steps(
         args.logging_steps, args.max_train_steps, logspace=False
     )
+    accelerator.print(log_steps)
 
     stats = defaultdict()
     stats["num_epochs"] = args.num_train_epochs
@@ -895,6 +896,8 @@ def main():
             # if accelerator.sync_gradients:
             if (index + 1) % gradient_accumulation_steps == 0:
                 completed_steps += 1
+                print(log_steps)
+
                 if completed_steps in log_steps:
                     accelerator.print(f"log step: {completed_steps}/{log_steps[-1]}")
                     sys.stdout.flush()
@@ -1069,8 +1072,9 @@ def get_cpt_steps(nsteps, max_train_steps, logspace=True):
         )
         step = None
     else:
-        step = int(np.around(max_train_steps / nsteps))
-        steps = np.arange(0, max_train_steps, step)
+        step = max(1, int(np.around(max_train_steps / nsteps)))
+
+        steps = np.arange(0, max_train_steps, step).astype(int)
 
     return steps, step
 
