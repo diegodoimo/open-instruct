@@ -813,10 +813,11 @@ def main():
 
     completed_steps = 0
     total_loss = 0
+    total_time = 0
     num_tokens = 0
-    start = time.time()
     for epoch in range(args.num_train_epochs):
         model.train()
+        start = time.time()
         for index, batch in enumerate(train_loader):
 
             if WORLD_SIZE == 1:
@@ -840,6 +841,8 @@ def main():
 
                 if (index + 1) % gradient_accumulation_steps == 0:
                     # # fsdp wrapper automatically puts the tensor to gpu device
+                    num_tokens += batch["input_ids"].numel()
+
                     outputs = model(**batch, use_cache=False)
                     loss = outputs.loss
                     loss = loss / gradient_accumulation_steps
@@ -857,6 +860,7 @@ def main():
                     # # FSDP NO SYNC FUNCTION we do not need to compute gradients
                     with model.no_sync():
                         # 1 forward and 1 backward must be inside the context manager
+                        num_tokens += batch["input_ids"].numel()
                         outputs = model(**batch, use_cache=False)
                         loss = outputs.loss
                         loss = loss / gradient_accumulation_steps
@@ -881,30 +885,23 @@ def main():
             # if accelerator.sync_gradients:
             if (index + 1) % gradient_accumulation_steps == 0:
                 completed_steps += 1
+                total_time += time.time() - start
 
                 if completed_steps in log_steps:
                     accelerator.print(f"log step: {completed_steps}/{log_steps[-1]}")
                     sys.stdout.flush()
-                    t_tot = time.time() - start
 
                     if WORLD_SIZE > 1:
                         total_loss = total_loss.reshape(1)
+                        dist.all_reduce(total_loss)
 
-                        avg_loss = [
-                            torch.zeros_like(total_loss) for _ in range(WORLD_SIZE)
-                        ]
-                        dist.all_gather(avg_loss, total_loss)
-                        avg_loss = (
-                            torch.cat(avg_loss).mean().item()
-                            / gradient_accumulation_steps
-                            / log_interval
-                        )
-                    else:
-                        avg_loss = (
-                            total_loss.item()
-                            / gradient_accumulation_steps
-                            / log_interval
-                        )
+                    avg_loss = (
+                        total_loss.item()
+                        / WORLD_SIZE
+                        / gradient_accumulation_steps
+                        / log_interval
+                    )
+
                     # avg_loss = (
                     #     accelerator.gather(total_loss).mean().item()
                     #     / gradient_accumulation_steps
@@ -912,10 +909,8 @@ def main():
                     # )
 
                     accelerator.print(
-                        f"LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot//3600: .2f} h {(t_tot%3600)/60: .2f} min"
+                        f"LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {total_time//3600: .2f} h {(total_time%3600)/60: .2f} min"
                     )
-                    print_memory_consumed(rank=RANK)
-                    sys.stdout.flush()
                     total_loss = 0
                     meter.update(
                         accelerator=accelerator,
@@ -934,6 +929,8 @@ def main():
                         do_val=True,
                         do_overlap=args.measure_overlap,
                     )
+                    print_memory_consumed(rank=RANK)
+                    sys.stdout.flush()
 
                 if completed_steps in checkpointing_steps and args.save_checkpoint:
                     accelerator.print("saving checkpoint")
@@ -947,6 +944,13 @@ def main():
 
                 if completed_steps >= args.max_train_steps:
                     break
+                start = time.time()
+
+        if WORLD_SIZE > 1:
+            num_tokens = torch.tensor([num_tokens]).to("cuda")
+            dist.all_reduce(num_tokens)
+            num_tokens = num_tokens.item()
+        throughput = num_tokens / total_time
 
         meter.update(
             accelerator=accelerator,
@@ -955,6 +959,7 @@ def main():
             epoch=epoch,
             do_test=True,
             do_overlap=args.measure_overlap,
+            throughput=throughput,
         )
         print_memory_consumed(rank=RANK)
 
@@ -1152,12 +1157,15 @@ class measure_statistics:
         do_overlap=False,
         do_val=False,
         do_test=False,
+        throughput=None,
     ):
 
         self.train_stats["epoch"][completed_steps] = epoch
         self.train_stats["iter"][completed_steps] = completed_steps
         if loss is not None:
             self.train_stats["loss"][completed_steps] = loss
+        if throughput is not None:
+            self.train_stats["throughput"][completed_steps] = throughput
 
         if do_val:
             accelerator.print("measuring validation accuracy")
