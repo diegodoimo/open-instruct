@@ -746,7 +746,6 @@ def main():
     log_steps, log_interval = get_cpt_steps(
         args.logging_steps, args.max_train_steps, logspace=False
     )
-    accelerator.print(log_steps)
 
     stats = defaultdict()
     stats["num_epochs"] = args.num_train_epochs
@@ -770,7 +769,7 @@ def main():
     output_dir = f"epoch_0"
     if args.output_dir is not None:
         output_dir = os.path.join(args.output_dir, output_dir)
-    if args.save_checkpoints:
+    if args.save_checkpoint:
         # save pretrained model
         accelerator.print("saving pretrained model at initialization..")
         sys.stdout.flush()
@@ -888,6 +887,8 @@ def main():
                     t_tot = time.time() - start
 
                     if WORLD_SIZE > 1:
+                        total_loss = total_loss.reshape(1)
+
                         avg_loss = [
                             torch.zeros_like(total_loss) for _ in range(WORLD_SIZE)
                         ]
@@ -1158,7 +1159,6 @@ class measure_statistics:
                 model=model,
                 dataloader=self.val_loader,
                 tokenizer=self.tokenizer,
-                restrict_targets=True,
             )
             logger.info(f"iter {completed_steps}. mmlu val accuracy: {acc:.4f}")
             self.train_stats["mmlu_val"][completed_steps] = acc
@@ -1170,7 +1170,6 @@ class measure_statistics:
                 model=model,
                 dataloader=self.test_loader,
                 tokenizer=self.tokenizer,
-                restrict_targets=True,
             )
             logger.info(f"mmlu test accuracy after epoch {epoch}: {acc:.4f}")
             self.train_stats["mmlu_val"][completed_steps] = acc

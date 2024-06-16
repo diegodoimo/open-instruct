@@ -5,8 +5,8 @@
 #SBATCH --nodes=1
 #SBATCH --time=100:00:00            
 #SBATCH --ntasks-per-node=1       
-#SBATCH --cpus-per-task=128           
-#SBATCH --mem=600G  #it is intended per node          
+#SBATCH --cpus-per-task=32           
+#SBATCH --mem=100G  #it is intended per node          
 #SBATCH --job-name=test
 #SBATCH --gres=gpu:2 #it is intended per node
 
@@ -66,6 +66,6 @@ srun torchrun \
     --logging_steps 20 \
     --eval_steps 10 \
     --activation_checkpointing \
-    --use_flash_attn
+    --use_flash_attn \
     #--measure_baselines
     #--save_checkpoint
