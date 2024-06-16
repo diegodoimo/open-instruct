@@ -641,7 +641,7 @@ def main():
 
     # should be done after wrapping the model in FSDP
     if args.activation_checkpointing:
-        accelerator.print("preparing checkpoints..")
+        accelerator.print("preparing activation checkpointing..")
         sys.stdout.flush()
         from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
             checkpoint_wrapper,
@@ -768,13 +768,14 @@ def main():
         filename=f"{filename}epoch{args.num_train_epochs}",
     )
 
-    # save pretrained model for double check
-    accelerator.print("saving pretrained model at initialization..")
-    sys.stdout.flush()
     output_dir = f"epoch_0"
     if args.output_dir is not None:
         output_dir = os.path.join(args.output_dir, output_dir)
-    # save_with_accelerate(accelerator, model, output_dir, args)
+    if args.save_checkpoints:
+        # save pretrained model
+        accelerator.print("saving pretrained model at initialization..")
+        sys.stdout.flush()
+        save_with_accelerate(accelerator, model, output_dir, args)
 
     if args.measure_baselines:
         accelerator.print("measuring baselines..")
@@ -791,9 +792,9 @@ def main():
         )
 
     accelerator.print("start training")
-    print_memory_consumed(rank=RANK)
     accelerator.print("memory before train run")
     sys.stdout.flush()
+    print_memory_consumed(rank=RANK)
 
     # *******************************************************************************
 
@@ -816,11 +817,9 @@ def main():
     total_loss = 0
     start = time.time()
     for epoch in range(args.num_train_epochs):
-        accelerator.print(f"epoch {epoch}")
         model.train()
 
         for index, batch in enumerate(train_loader):
-            accelerator.print(f"index {index+1}")
 
             if WORLD_SIZE == 1:
                 # NO FSDP
@@ -894,6 +893,7 @@ def main():
                             torch.zeros_like(total_loss) for _ in range(WORLD_SIZE)
                         ]
                         dist.all_gather(avg_loss, total_loss)
+                        print(f"{RANK}", avg_loss)
                         avg_loss = (
                             torch.cat(avg_loss).mean().item()
                             / gradient_accumulation_steps
