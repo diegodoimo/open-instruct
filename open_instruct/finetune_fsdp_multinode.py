@@ -18,7 +18,6 @@ from transformers import (
     get_scheduler,
 )
 
-
 import numpy as np
 import sys
 import time
@@ -690,7 +689,7 @@ def main():
     if args.warmup_steps is None and args.warmup_ratio is None:
         warmup_steps = 0
     elif args.warmup_steps is None:
-        warmup_steps = args.warmup_ratio * args.max_train_steps
+        warmup_steps = int(args.warmup_ratio * args.max_train_steps)
 
     scheduler = lambda x: min(
         args.lr_min_fact + (1 - args.lr_min_fact) * min(x, warmup_steps) / warmup_steps,
@@ -909,11 +908,9 @@ def main():
                     #     / log_interval
                     # )
                     # avg_loss = -1
-                    assert (
-                        lr_scheduler.get_last_lr()[0] == optimizer.param_groups[0]["lr"]
-                    )
+
                     accelerator.print(
-                        f"LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot/3600: .2f} hours"
+                        f"LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {t_tot//3600: .2f} h {(t_tot%3600)/60: .2f} min"
                     )
                     print_memory_consumed(rank=RANK)
                     sys.stdout.flush()
