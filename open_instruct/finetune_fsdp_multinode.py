@@ -914,7 +914,7 @@ def main():
 
                     accelerator.print(
                         f"LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, \
-                            Time: {total_time//3600: .2f} h {(total_time%3600)/60: .2f} min"
+                            Time: {total_time//3600} h {(total_time%3600)/60: .2f} min"
                     )
                     total_loss = 0
                     meter.update(
@@ -956,7 +956,7 @@ def main():
             dist.all_reduce(num_tokens)
             num_tokens = num_tokens.item()
         throughput = num_tokens / total_time
-        accelerator.print(f"processed {throughput} token/sec")
+        accelerator.print(f"processed {throughput: .2f} token/sec")
 
         meter.update(
             accelerator=accelerator,
@@ -985,9 +985,14 @@ def main():
 def evaluate(model, dataloader, tokenizer):
     model.eval()
 
+    baseline_time = 0
+    gt_time = 0
+    subj_time = 0
     predictions, ground_truths, subjects = [], [], []
 
     for iter_num, batch in enumerate(dataloader):
+        torch.cuda.synchronize()
+        start = time.time()
         if (iter_num + 1) % int(1000 / dataloader.batch_size) == 0 and RANK == 0:
             print(
                 f"{iter_num * dataloader.batch_size+1}/ {len(dataloader.dataset)} inputs processed"
@@ -1008,15 +1013,32 @@ def evaluate(model, dataloader, tokenizer):
 
         last_logits = logits[torch.arange(logits.shape[0]), seq_len - 1]
 
+        torch.cuda.synchronize()
+        end1 = time.time()
+        baseline_time += end1 - start
+
         predictions.extend(torch.argmax(last_logits, dim=-1, keepdims=True))
+
         ground_truths.extend(targets)
+        torch.cuda.synchronize()
+        end3 = time.time()
+        gt_time += end3 - end1
+
         subjects.extend(
             [
                 torch.tensor([subject_to_int[subj]]).to("cuda")
                 for subj in batch["subjects"]
             ]
         )
+        torch.cuda.synchronize()
+        subj_time += time.time() - end3
 
+    if RANK == 0:
+        print("baseline", baseline_time)
+        print("pred+gt", gt_time)
+        print("subj", subj_time)
+    sys.stdout.flush()
+    assert False
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
     subjects = torch.cat(subjects)
