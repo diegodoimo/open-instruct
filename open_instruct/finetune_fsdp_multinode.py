@@ -1019,6 +1019,7 @@ def evaluate(model, dataloader, tokenizer):
 
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
+    subjects = torch.cat(subjects)
 
     if WORLD_SIZE > 1:
         pred_list = [torch.zeros_like(predictions) for _ in range(WORLD_SIZE)]
