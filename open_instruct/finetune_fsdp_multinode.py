@@ -747,7 +747,6 @@ def main():
     log_steps, log_interval = get_cpt_steps(
         args.logging_steps, args.max_train_steps, logspace=False
     )
-    accelerator.print(log_steps)
 
     stats = defaultdict()
     stats["num_epochs"] = args.num_train_epochs
@@ -816,11 +815,9 @@ def main():
     total_loss = 0
     start = time.time()
     for epoch in range(args.num_train_epochs):
-        accelerator.print(f"epoch {epoch}")
         model.train()
 
         for index, batch in enumerate(train_loader):
-            accelerator.print(f"index {index+1}")
 
             if WORLD_SIZE == 1:
                 # NO FSDP
@@ -1161,7 +1158,6 @@ class measure_statistics:
                 model=model,
                 dataloader=self.val_loader,
                 tokenizer=self.tokenizer,
-                restrict_targets=True,
             )
             logger.info(f"iter {completed_steps}. mmlu val accuracy: {acc:.4f}")
             self.train_stats["mmlu_val"][completed_steps] = acc
@@ -1173,7 +1169,6 @@ class measure_statistics:
                 model=model,
                 dataloader=self.test_loader,
                 tokenizer=self.tokenizer,
-                restrict_targets=True,
             )
             logger.info(f"mmlu test accuracy after epoch {epoch}: {acc:.4f}")
             self.train_stats["mmlu_val"][completed_steps] = acc
