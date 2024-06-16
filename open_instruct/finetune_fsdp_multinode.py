@@ -1054,10 +1054,11 @@ def evaluate(model, dataloader, tokenizer):
 
         predictions = torch.cat(pred_list, dim=0).cpu()
         ground_truths = torch.cat(gt_list, dim=0).cpu()
-        subjects = torch.cat(subject_list, dim=0).cpu()
+        subjects = torch.cat(subject_list, dim=0)
 
     ground_truths = np.array([tokenizer.decode(tg).strip() for tg in ground_truths])
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
+    subjects = subjects.cpu().numpy()
 
     acc_pred = compute_accuracy(predictions, ground_truths, subjects)
 
