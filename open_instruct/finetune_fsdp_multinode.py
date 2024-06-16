@@ -821,7 +821,7 @@ def main():
 
             if WORLD_SIZE == 1:
                 # NO FSDP
-                batch = {key: val.to("cuda") for key, val in batch}
+                batch = {key: val.to("cuda") for key, val in batch.items()}
                 outputs = model(**batch, use_cache=False)
                 loss = outputs.loss
                 loss = loss / gradient_accumulation_steps
@@ -902,7 +902,7 @@ def main():
                         )
                     else:
                         avg_loss = (
-                            avg_loss.item() / gradient_accumulation_steps / log_interval
+                            total_loss.item() / gradient_accumulation_steps / log_interval
                         )
                     # avg_loss = (
                     #     accelerator.gather(total_loss).mean().item()
