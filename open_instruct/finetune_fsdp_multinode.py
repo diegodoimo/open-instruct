@@ -909,7 +909,8 @@ def main():
                     # )
 
                     accelerator.print(
-                        f"LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, Time: {total_time//3600: .2f} h {(total_time%3600)/60: .2f} min"
+                        f"LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, \
+                            Time: {total_time//3600: .2f} h {(total_time%3600)/60: .2f} min"
                     )
                     total_loss = 0
                     meter.update(
@@ -951,6 +952,7 @@ def main():
             dist.all_reduce(num_tokens)
             num_tokens = num_tokens.item()
         throughput = num_tokens / total_time
+        accelerator.print(f"processed {throughput} token/sec")
 
         meter.update(
             accelerator=accelerator,
