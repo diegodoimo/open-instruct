@@ -67,5 +67,5 @@ srun torchrun \
     --eval_steps 10 \
     --activation_checkpointing \
     --use_flash_attn \
-    #--measure_baselines
+    --measure_baselines
     #--save_checkpoint
