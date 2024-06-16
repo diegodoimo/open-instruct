@@ -1036,6 +1036,7 @@ def evaluate(model, dataloader, tokenizer):
 
     ground_truths = np.array([tokenizer.decode(tg).strip() for tg in ground_truths])
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
+    subjects = subjects.numpy()
 
     acc_pred = compute_accuracy(predictions, ground_truths, subjects)
 
