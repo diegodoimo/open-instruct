@@ -809,6 +809,7 @@ def main():
     )
     logger.info(f"  Gradient Accumulation steps = {gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
+    logger.info(f"  Warmup steps = {warmup_steps}")
     logger.info(f"  Log steps number = {len(log_steps)}")
 
     completed_steps = 0
