@@ -813,10 +813,10 @@ def main():
 
     completed_steps = 0
     total_loss = 0
+    num_tokens = 0
     start = time.time()
     for epoch in range(args.num_train_epochs):
         model.train()
-
         for index, batch in enumerate(train_loader):
 
             if WORLD_SIZE == 1:
@@ -827,6 +827,7 @@ def main():
                 loss = loss / gradient_accumulation_steps
                 loss.backward()
                 total_loss += loss.detach().float()
+                num_tokens += batch["input_ids"].numel()
 
                 if (index + 1) % gradient_accumulation_steps == 0:
                     torch.nn.utils.clip_grad_norm_(
@@ -916,12 +917,18 @@ def main():
                     print_memory_consumed(rank=RANK)
                     sys.stdout.flush()
                     total_loss = 0
+                    meter.update(
+                        accelerator=accelerator,
+                        model=model,
+                        loss=avg_loss,
+                        completed_steps=completed_steps,
+                        epoch=epoch,
+                    )
 
                 if completed_steps in eval_steps:
                     meter.update(
                         accelerator=accelerator,
                         model=model,
-                        loss=avg_loss,
                         completed_steps=completed_steps,
                         epoch=epoch,
                         do_val=True,
