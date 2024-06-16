@@ -28,7 +28,7 @@ from collections import defaultdict
 
 # *******************************************************************************
 
-from my_utils.dataloader_utils import get_dataloader
+from my_utils.dataloader_utils import get_dataloader, DataCollatorForCausalLMEval
 from my_utils.helpers import print_memory_consumed, save_with_accelerate
 from my_utils.dataset_utils import (
     get_dataset_open_instruct_new,
@@ -586,6 +586,14 @@ def main():
         split="test",
     ).construct_dataset()
 
+    global int_to_subject
+    global subject_to_int
+
+    int_to_subject = {
+        i: subject for i, subject in enumerate(np.unique(test_dataset["subjects"]))
+    }
+    subject_to_int = {subj: i for i, subj in int_to_subject.items()}
+
     # ******************************************************************************************
     # ignore the issue of pad token in Llamas
     assert args.per_device_train_batch_size == 1
@@ -608,6 +616,7 @@ def main():
         world_size=world_size,
         shuffle=False,
         num_processes=6,
+        collate_fn=DataCollatorForCausalLMEval(tokenizer.pad_token_id),
     )
     test_loader = None
     if test_dataset is not None:
@@ -618,6 +627,7 @@ def main():
             world_size=world_size,
             shuffle=False,
             num_processes=6,
+            collate_fn=DataCollatorForCausalLMEval(tokenizer.pad_token_id),
         )
 
     # *******************************************************************************
@@ -902,12 +912,6 @@ def main():
                         / log_interval
                     )
 
-                    # avg_loss = (
-                    #     accelerator.gather(total_loss).mean().item()
-                    #     / gradient_accumulation_steps
-                    #     / log_interval
-                    # )
-
                     accelerator.print(
                         f"LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, \
                             Time: {total_time//3600: .2f} h {(total_time%3600)/60: .2f} min"
@@ -981,7 +985,7 @@ def main():
 def evaluate(model, dataloader, tokenizer):
     model.eval()
 
-    predictions, ground_truths = [], []
+    predictions, ground_truths, subjects = [], [], []
 
     for iter_num, batch in enumerate(dataloader):
         if (iter_num + 1) % int(1000 / dataloader.batch_size) == 0 and RANK == 0:
@@ -1006,6 +1010,12 @@ def evaluate(model, dataloader, tokenizer):
 
         predictions.extend(torch.argmax(last_logits, dim=-1, keepdims=True))
         ground_truths.extend(targets)
+        subjects.extend(
+            [
+                torch.tensor([subject_to_int[subj]]).to("cuda")
+                for subj in batch["subjects"]
+            ]
+        )
 
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
@@ -1013,18 +1023,22 @@ def evaluate(model, dataloader, tokenizer):
     if WORLD_SIZE > 1:
         pred_list = [torch.zeros_like(predictions) for _ in range(WORLD_SIZE)]
         gt_list = [torch.zeros_like(ground_truths) for _ in range(WORLD_SIZE)]
+        subject_list = [torch.zeros_like(subjects) for _ in range(WORLD_SIZE)]
 
         dist.all_gather(pred_list, predictions)
         dist.all_gather(gt_list, ground_truths)
+        dist.all_gather(subject_list, subjects)
+
         predictions = torch.cat(pred_list, dim=0).cpu()
         ground_truths = torch.cat(gt_list, dim=0).cpu()
+        subjects = torch.cat(subject_list, dim=0).cpu()
 
     ground_truths = np.array([tokenizer.decode(tg).strip() for tg in ground_truths])
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
 
-    acc_pred = compute_accuracy(predictions, ground_truths)
+    acc_pred = compute_accuracy(predictions, ground_truths, subjects)
 
-    return acc_pred["micro"]
+    return acc_pred["macro"]
 
 
 def compute_accuracy(predictions, answers, subjects=None):
@@ -1052,7 +1066,7 @@ def compute_accuracy(predictions, answers, subjects=None):
                     num_correct += 1
             acc_tmp = num_correct / tot_ans
 
-            acc_subj[subject] = acc_tmp
+            acc_subj[int_to_subject[subject]] = acc_tmp
 
         accuracy["subjects"] = acc_subj
         accuracy["macro"] = np.mean(list(acc_subj.values()))

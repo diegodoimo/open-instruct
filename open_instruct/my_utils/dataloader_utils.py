@@ -75,6 +75,38 @@ class DataCollatorForCausalLM:
         )
 
 
+@dataclass
+class DataCollatorForCausalLMEval:
+    """Collate examples for supervised fine-tuning."""
+
+    pad_token_id: int
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        # in the structure of open-instruct the instances are already tensors, and already take into account max_seq_len
+
+        input_ids = [instance["input_ids"] for instance in instances]
+        labels = [instance["labels"] for instance in instances]
+        attention_mask = [instance["attention_mask"] for instance in instances]
+        subjects = [instance["subjects"] for instance in instances]
+
+        input_ids = torch.nn.utils.rnn.pad_sequence(
+            input_ids, batch_first=True, padding_value=self.pad_token_id
+        )
+        labels = torch.nn.utils.rnn.pad_sequence(
+            labels, batch_first=True, padding_value=IGNORE_INDEX
+        )
+        attention_mask = torch.nn.utils.rnn.pad_sequence(
+            attention_mask, batch_first=True, padding_value=0
+        )
+
+        return dict(
+            input_ids=input_ids,
+            labels=labels,
+            attention_mask=attention_mask,
+            subjects=subjects,
+        )
+
+
 # old version
 # @dataclass
 # class DataCollatorForCausalLM:
