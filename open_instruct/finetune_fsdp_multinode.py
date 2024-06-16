@@ -896,7 +896,6 @@ def main():
             # if accelerator.sync_gradients:
             if (index + 1) % gradient_accumulation_steps == 0:
                 completed_steps += 1
-                print(log_steps)
 
                 if completed_steps in log_steps:
                     accelerator.print(f"log step: {completed_steps}/{log_steps[-1]}")

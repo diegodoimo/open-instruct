@@ -63,7 +63,7 @@ srun torchrun \
     --samples_per_subject 20 \
     --out_filename ""  \
     --checkpointing_steps 50 \
-    --logging_steps 1 \
+    --logging_steps 1000 \
     --eval_steps 10 \
     --activation_checkpointing \
     --use_flash_attn
