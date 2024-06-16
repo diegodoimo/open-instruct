@@ -694,10 +694,10 @@ def main():
     if args.warmup_steps is None and args.warmup_ratio is None:
         warmup_steps = 0
     elif args.warmup_steps is None:
-        warmup_steps = args.warmup_ratio * args.max_train_stepss
+        warmup_steps = args.warmup_ratio * args.max_train_steps
 
     scheduler = lambda x: min(
-        1 - (1 - min(x, warmup_steps) / warmup_steps),
+        min(x, warmup_steps) / warmup_steps,
         0.1
         + 0.5
         * (1 - 0.1)
@@ -780,7 +780,7 @@ def main():
     output_dir = f"epoch_0"
     if args.output_dir is not None:
         output_dir = os.path.join(args.output_dir, output_dir)
-    #save_with_accelerate(accelerator, model, output_dir, args)
+    # save_with_accelerate(accelerator, model, output_dir, args)
 
     if args.measure_baselines:
         accelerator.print("measuring baselines..")
