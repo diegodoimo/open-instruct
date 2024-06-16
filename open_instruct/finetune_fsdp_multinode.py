@@ -691,9 +691,9 @@ def main():
     sys.stdout.flush()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
 
-    if warmup_steps is None and args.warmup_ratio is None:
+    if args.warmup_steps is None and args.warmup_ratio is None:
         warmup_steps = 0
-    elif warmup_steps is None:
+    elif args.warmup_steps is None:
         warmup_steps = args.warmup_ratio * args.max_train_stepss
 
     scheduler = lambda x: min(
