@@ -630,7 +630,7 @@ def main():
         weight_decay=args.weight_decay,
     )
 
-    lr_scheduler, warmup_steps = get_scheduler(
+    lr_scheduler = get_scheduler(
         args.lr_scheduler_type,
         optimizer,
         epochs=args.num_train_epochs,
@@ -734,7 +734,6 @@ def main():
             epoch=0,
             do_overlap=args.measure_overlap,
             do_val=True,
-            do_test=True,
         )
 
     accelerator.print("start training")

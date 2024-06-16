@@ -2,12 +2,12 @@
 #SBATCH --partition=DGX
 #SBATCH --account=lade
 #SBATCH --nodes=1
-#SBATCH --time=4:00:00            
+#SBATCH --time=24:00:00            
 #SBATCH --ntasks-per-node=1       
 #SBATCH --cpus-per-task=32           
-#SBATCH --mem=100G                
+#SBATCH --mem=80G                
 #SBATCH --job-name=test
-#SBATCH --gres=gpu:2 
+#SBATCH --gres=gpu:1 
 
 #source /etc/profile.d/modules.sh
 #module use /opt/nvidia/hpc_sdk/modulefiles/
@@ -22,23 +22,18 @@ TOTAL_BATCH_SIZE=16
 BATCH_SIZE_PER_GPU=1
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 
-model_name="llama-2-7b"
-folder="llama_v2"
-
-#model_name="mistral-1-7b"
-#folder="mistral_v1"
+model_name="llama-3-8b"
+folder="llama_v3"
 
 # Lora training
-
-# accelerate launch \
-#     --mixed_precision bf16 \
-#     --num_machines 1 \
-#     --num_processes $NUM_GPUS \
-#     --dynamo_backend 'no' \
-
-torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
-       	--nnodes=1  --nproc-per-node=2 \
-   open_instruct/finetune_fsdp_multinode.py \
+#torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
+#        	--nnodes=1  --nproc-per-node=1 \
+accelerate launch \
+    --mixed_precision bf16 \
+    --num_machines 1 \
+    --num_processes $NUM_GPUS \
+    --dynamo_backend 'no' \
+   open_instruct/finetune.py \
     --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
     --use_lora \
     --lora_rank 64 \
@@ -49,20 +44,19 @@ torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
     --train_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/processed/dolly/dolly_data.jsonl \
     --val_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/eval/mmlu \
     --test_file /orfeo/cephfs/scratch/area/ddoimo/data/open_instruct/eval/mmlu \
-    --max_seq_length 2048 \
+    --max_seq_length 1024 \
     --batch_size $TOTAL_BATCH_SIZE \
     --preprocessing_num_workers 16 \
     --checkpointing_steps epoch \
     --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 1 \
-    --batch_size $TOTAL_BATCH_SIZE \
     --gradient_accumulation_steps $GRADIENT_ACC_STEPS \
     --learning_rate 2e-4 \
     --lr_scheduler_type cosine \
     --warmup_ratio 0.05 \
     --weight_decay 0. \
     --num_train_epochs 4 \
-    --output_dir "./results/fsdp_test/${model_name}/" \
+    --output_dir ./results/${model_name}/ \
     --measure_baselines \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
     --samples_per_subject 20 \
