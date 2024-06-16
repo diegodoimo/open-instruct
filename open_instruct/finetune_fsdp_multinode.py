@@ -697,11 +697,18 @@ def main():
         warmup_steps = args.warmup_ratio * args.max_train_steps
 
     scheduler = lambda x: min(
-        min(x, warmup_steps) / warmup_steps,
+        0.1 + (1 - 0.1) * min(x, warmup_steps) / warmup_steps,
         0.1
         + 0.5
         * (1 - 0.1)
-        * (1 + math.cos(min(x, args.max_train_steps) / args.max_train_steps * math.pi)),
+        * (
+            1
+            + math.cos(
+                max(0, x - warmup_steps)
+                / (args.max_train_steps - warmup_steps)
+                * math.pi
+            )
+        ),
     )
     lr_scheduler = LambdaLR(optimizer, lambda x: scheduler(x))
 
@@ -821,10 +828,11 @@ def main():
     total_loss = 0
     start = time.time()
     for epoch in range(args.num_train_epochs):
-
+        accelerator.print(f"epoch {epoch}")
         model.train()
 
         for index, batch in enumerate(train_loader):
+            accelerator.print(f"index {index+1}")
 
             if WORLD_SIZE == 1:
                 # NO FSDP
@@ -860,7 +868,7 @@ def main():
                     lr_scheduler.step()
 
                 else:
-                    pass
+                    diego = 1
                     # # FSDP NO SYNC FUNCTION we do not need to compute gradients
                     # with model.no_sync():
                     #     # 1 forward and 1 backward must be inside the context manager
