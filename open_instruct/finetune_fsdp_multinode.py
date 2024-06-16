@@ -770,7 +770,7 @@ def main():
     output_dir = f"epoch_0"
     if args.output_dir is not None:
         output_dir = os.path.join(args.output_dir, output_dir)
-    if args.save_checkpoints:
+    if args.save_checkpoint:
         # save pretrained model
         accelerator.print("saving pretrained model at initialization..")
         sys.stdout.flush()
@@ -888,6 +888,8 @@ def main():
                     t_tot = time.time() - start
 
                     if WORLD_SIZE > 1:
+                        total_loss = total_loss.reshape(1)
+
                         avg_loss = [
                             torch.zeros_like(total_loss) for _ in range(WORLD_SIZE)
                         ]
