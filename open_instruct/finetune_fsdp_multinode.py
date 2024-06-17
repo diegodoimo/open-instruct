@@ -1013,32 +1013,15 @@ def evaluate(model, dataloader, tokenizer):
 
         last_logits = logits[torch.arange(logits.shape[0]), seq_len - 1]
 
-        torch.cuda.synchronize()
-        end1 = time.time()
-        baseline_time += end1 - start
-
         predictions.extend(torch.argmax(last_logits, dim=-1, keepdims=True))
-
         ground_truths.extend(targets)
-        torch.cuda.synchronize()
-        end3 = time.time()
-        gt_time += end3 - end1
-
         subjects.extend(
             [
                 torch.tensor([subject_to_int[subj]]).to("cuda")
                 for subj in batch["subjects"]
             ]
         )
-        torch.cuda.synchronize()
-        subj_time += time.time() - end3
 
-    if RANK == 0:
-        print("baseline", baseline_time)
-        print("pred+gt", gt_time)
-        print("subj", subj_time)
-    sys.stdout.flush()
-    assert False
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
     subjects = torch.cat(subjects)
@@ -1062,12 +1045,12 @@ def evaluate(model, dataloader, tokenizer):
 
     acc_pred = compute_accuracy(predictions, ground_truths, subjects)
 
-    return acc_pred["macro"]
+    return acc_pred
 
 
 def compute_accuracy(predictions, answers, subjects=None):
 
-    accuracy = {}
+    accuracy = defaultdict(lambda: "not computed")
     tot_ans = len(predictions)
     num_correct = 0
     for pred, ans in zip(predictions, answers):
@@ -1215,8 +1198,12 @@ class measure_statistics:
                 dataloader=self.val_loader,
                 tokenizer=self.tokenizer,
             )
-            logger.info(f"iter {completed_steps}. mmlu val accuracy: {acc:.4f}")
-            self.train_stats["mmlu_val"][completed_steps] = acc
+            logger.info(
+                f"iter {completed_steps}. mmlu val accuracy: macro {acc['macro']:.4f}, micro {acc['micro']:.4f}"
+            )
+
+            self.train_stats["mmlu_val_macro"][completed_steps] = acc["macro"]
+            self.train_stats["mmlu_val_micro"][completed_steps] = acc["micro"]
 
         if do_test:
             accelerator.print("measuring test accuracy")
@@ -1226,8 +1213,13 @@ class measure_statistics:
                 dataloader=self.test_loader,
                 tokenizer=self.tokenizer,
             )
-            logger.info(f"mmlu test accuracy after epoch {epoch}: {acc:.4f}")
-            self.train_stats["mmlu_val"][completed_steps] = acc
+
+            logger.info(
+                f"mmlu test accuracy after epoch {epoch}: macro {acc['macro']:.4f}, micro {acc['micro']:.4f}"
+            )
+
+            self.train_stats["mmlu_test_macro"][completed_steps] = acc["macro"]
+            self.train_stats["mmlu_test_micro"][completed_steps] = acc["micro"]
 
         if do_overlap:
             accelerator.print("overlap computation started")
