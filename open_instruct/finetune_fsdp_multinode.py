@@ -841,7 +841,7 @@ def main():
         model.train()
         start = time.time()
         num_tokens = 0
-        # gradient accumulation step may not finish properly so we call zero grad here
+        # gradient accumulation step may not finish with a proper update at the end of the epoch so we call zero grad here
         optimizer.zero_grad()
         for index, batch in enumerate(train_loader):
 
