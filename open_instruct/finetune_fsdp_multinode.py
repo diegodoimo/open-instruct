@@ -821,11 +821,12 @@ def main():
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
     logger.info(f"  Learning rate = {args.learning_rate}")
     logger.info(f"  Weight Decay = {args.weight_decay}")
+    logger.info(f"  Lora Rank = {args.lora_rank}")
+    logger.info(f"  Lora Alpha = {args.lora_alpha}")
+    logger.info(f"  Lora Dropout = {args.lora_dropout}")
+    logger.info(f"  Batch size per device = {args.per_device_train_batch_size}")
     logger.info(
-        f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
-    )
-    logger.info(
-        f"  Total train batch size (w. parallel, distributed & accumulation) = {args.batch_size}"
+        f"  Total batch size (w. parallel, distributed & accumulation) = {args.batch_size}"
     )
     logger.info(f"  Gradient Accumulation steps = {gradient_accumulation_steps}")
     logger.info(f"  len_dataloader = {len(train_loader)}")
