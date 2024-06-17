@@ -806,7 +806,7 @@ def main():
             epoch=0,
             do_overlap=args.measure_overlap,
             do_val=True,
-            do_test=WORLD_SIZE == 1,
+            do_test=False,
         )
 
     accelerator.print("start training")
