@@ -421,7 +421,7 @@ def main():
         cpu_offload=False,
         ignored_modules=None,
         limit_all_gathers=True,
-        use_orig_params=False,
+        use_orig_params=True,
         param_init_fn=None,
         sync_module_states=True,
         forward_prefetch=False,
@@ -673,28 +673,35 @@ def main():
             model, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=check_fn
         )
 
-    # optimizer = get_optimizer(
-    #     model=model,
-    #     learning_rate=args.learning_rate,
-    #     weight_decay=args.weight_decay,
-    # )
-
-    # no_decay = ["bias", "layer_norm.weight"]
-    # optimizer_grouped_parameters = [
-    #    {
-    #        "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
-    #        "weight_decay": args.weight_decay,
-    #    },
-    #    {
-    #        "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
-    #        "weight_decay": 0.0,
-    #    },
-    # ]
+    # ********************************************************************************
 
     # model must be alredy prepared here!
     accelerator.print("setup scheduler and optimizer..")
     sys.stdout.flush()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+    # optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+
+    # "use_orig_parameters" needed for this split of parameters!
+    no_decay = ["bias", "layer_norm.weight"]
+    optimizer_grouped_parameters = [
+        {
+            "params": [
+                p
+                for n, p in model.named_parameters()
+                if not any(nd in n for nd in no_decay)
+            ],
+            "weight_decay": args.weight_decay,
+        },
+        {
+            "params": [
+                p
+                for n, p in model.named_parameters()
+                if any(nd in n for nd in no_decay)
+            ],
+            "weight_decay": 0.0,
+        },
+    ]
+
+    optimizer = torch.optim.AdamW(optimizer_grouped_parameters, lr=args.learning_rate)
 
     if args.warmup_steps is None and args.warmup_ratio is None:
         warmup_steps = 0
@@ -717,7 +724,6 @@ def main():
     )
     lr_scheduler = LambdaLR(optimizer, lambda x: scheduler(x))
 
-    # ************************************************************************
     # model must be prepared before initializing th optimizer
     # for the optimizer and lr the accelerator. prepare is needed to skip the update inside accclerator.accumulate, otherwise is not needed
 
@@ -758,10 +764,14 @@ def main():
     )
 
     stats = defaultdict()
+
     stats["num_epochs"] = args.num_train_epochs
     stats["lr"] = args.learning_rate
     stats["scheduler"] = args.lr_scheduler_type
     stats["batch_size"] = args.batch_size
+    stats["weight_decay"] = args.weight_decay
+    stats["lora_rank"] = args.lora_rank
+    stats["lora_dropout"] = args.lora_dropout
 
     meter = measure_statistics(
         stats,
@@ -776,10 +786,10 @@ def main():
         filename=f"{filename}epoch{args.num_train_epochs}",
     )
 
-    output_dir = f"epoch_0"
-    if args.output_dir is not None:
-        output_dir = os.path.join(args.output_dir, output_dir)
     if args.save_checkpoint:
+        output_dir = f"epoch_0"
+        if args.output_dir is not None:
+            output_dir = os.path.join(args.output_dir, output_dir)
         # save pretrained model
         accelerator.print("saving pretrained model at initialization..")
         sys.stdout.flush()
@@ -809,7 +819,8 @@ def main():
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
-    logger.info(f"  len_dataloader = {len(train_loader)}")
+    logger.info(f"  Learning rate = {args.learning_rate}")
+    logger.info(f"  Weight Decay = {args.weight_decay}")
     logger.info(
         f"  Instantaneous batch size per device = {args.per_device_train_batch_size}"
     )
@@ -817,6 +828,7 @@ def main():
         f"  Total train batch size (w. parallel, distributed & accumulation) = {args.batch_size}"
     )
     logger.info(f"  Gradient Accumulation steps = {gradient_accumulation_steps}")
+    logger.info(f"  len_dataloader = {len(train_loader)}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
     logger.info(f"  Warmup steps = {warmup_steps}")
     logger.info(f"  Log steps number = {len(log_steps)}")
@@ -824,10 +836,11 @@ def main():
     completed_steps = 0
     total_loss = 0
     total_time = 0
-    num_tokens = 0
+
     for epoch in range(args.num_train_epochs):
         model.train()
         start = time.time()
+        num_tokens = 0
         for index, batch in enumerate(train_loader):
 
             if WORLD_SIZE == 1:
@@ -914,7 +927,7 @@ def main():
 
                     accelerator.print(
                         f"LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}, \
-                            Time: {total_time//3600} h {(total_time%3600)/60: .2f} min"
+                            Time: {int(total_time//3600)} h {(total_time%3600)/60: .2f} min"
                     )
                     total_loss = 0
                     meter.update(
@@ -955,8 +968,8 @@ def main():
             num_tokens = torch.tensor([num_tokens]).to("cuda")
             dist.all_reduce(num_tokens)
             num_tokens = num_tokens.item()
-        throughput = num_tokens / total_time
-        accelerator.print(f"processed {throughput: .2f} token/sec")
+        throughput = num_tokens / total_time / WORLD_SIZE
+        accelerator.print(f"processed {throughput: .2f} token/sec/gpu")
 
         meter.update(
             accelerator=accelerator,
@@ -985,17 +998,17 @@ def main():
 def evaluate(model, dataloader, tokenizer):
     model.eval()
 
-    baseline_time = 0
-    gt_time = 0
-    subj_time = 0
     predictions, ground_truths, subjects = [], [], []
-
+    num_tokens = 0
+    total_time = 0
+    start = time.time()
     for iter_num, batch in enumerate(dataloader):
-        torch.cuda.synchronize()
-        start = time.time()
-        if (iter_num + 1) % int(1000 / dataloader.batch_size) == 0 and RANK == 0:
+
+        if (iter_num + 1) % int(
+            1000 / (dataloader.batch_size * WORLD_SIZE)
+        ) == 0 and RANK == 0:
             print(
-                f"{iter_num * dataloader.batch_size+1}/ {len(dataloader.dataset)} inputs processed"
+                f"{iter_num * dataloader.batch_size*WORLD_SIZE+1}/ {len(dataloader.dataset)} inputs processed"
             )
             sys.stdout.flush()
 
@@ -1008,11 +1021,7 @@ def evaluate(model, dataloader, tokenizer):
         logits = outputs.logits
         seq_len = torch.sum(mask, dim=1)
 
-        # we alredy select the last one here
-        # logits, targets = all_gather_logits(logits, targets, seq_len)
-
         last_logits = logits[torch.arange(logits.shape[0]), seq_len - 1]
-
         predictions.extend(torch.argmax(last_logits, dim=-1, keepdims=True))
         ground_truths.extend(targets)
         subjects.extend(
@@ -1021,6 +1030,9 @@ def evaluate(model, dataloader, tokenizer):
                 for subj in batch["subjects"]
             ]
         )
+        num_tokens += batch["input_ids"].numel()
+
+    total_time = time.time() - start
 
     predictions = torch.cat(predictions)
     ground_truths = torch.cat(ground_truths)
@@ -1038,6 +1050,15 @@ def evaluate(model, dataloader, tokenizer):
         predictions = torch.cat(pred_list, dim=0).cpu()
         ground_truths = torch.cat(gt_list, dim=0).cpu()
         subjects = torch.cat(subject_list, dim=0)
+
+        num_tokens = torch.tensor([num_tokens]).to("cuda")
+        dist.all_reduce(num_tokens)
+        num_tokens = num_tokens.item()
+
+    throughput = num_tokens / total_time / WORLD_SIZE
+    if RANK == 0:
+        print(f"inference throughput: {throughput: .2f} token/sec/gpu")
+        sys.stdout.flush()
 
     ground_truths = np.array([tokenizer.decode(tg).strip() for tg in ground_truths])
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
