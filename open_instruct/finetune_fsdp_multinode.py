@@ -357,6 +357,7 @@ def parse_args():
 
     parser.add_argument("--overlap_base_dir", type=str, default=None, help="")
     parser.add_argument("--save_checkpoint", action="store_true")
+    parser.add_argument("--eval_only", action="store_true")
 
     args = parser.parse_args()
 
@@ -806,8 +807,11 @@ def main():
             epoch=0,
             do_overlap=args.measure_overlap,
             do_val=True,
-            do_test=False,
+            do_test=args.eval_only,
         )
+
+    if args.eval_only:
+        assert False, "Evaluation mode selected. Progam ended."
 
     accelerator.print("start training")
     accelerator.print("memory before train run")
