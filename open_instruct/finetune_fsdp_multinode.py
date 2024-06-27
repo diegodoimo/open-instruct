@@ -141,6 +141,8 @@ def parse_args():
         default=0.1,
         help="The dropout rate of lora modules.",
     )
+    parser.add_argument("--use_dora", action="store_true")
+    parser.add_argument("--use_rslora", action="store_true")
     parser.add_argument(
         "--use_flash_attn",
         action="store_true",
@@ -505,6 +507,8 @@ def main():
                     "up_proj",
                     "down_proj",
                 ],
+                use_dora=args.use_dora,
+                use_rslora=args.use_rslora,
             )
             model = get_peft_model(model, peft_config)
 
@@ -828,6 +832,8 @@ def main():
     logger.info(f"  Lora Rank = {args.lora_rank}")
     logger.info(f"  Lora Alpha = {args.lora_alpha}")
     logger.info(f"  Lora Dropout = {args.lora_dropout}")
+    logger.info(f"  Use Dora = {args.use_dora}")
+    logger.info(f"  Use rslora = {args.rs_lora}")
     logger.info(f"  Batch size per device = {args.per_device_train_batch_size}")
     logger.info(
         f"  Total batch size (w. parallel, distributed & accumulation) = {args.batch_size}"
