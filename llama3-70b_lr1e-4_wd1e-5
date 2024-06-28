@@ -1,0 +1,363 @@
+[2024-06-18 02:30:11,713] torch.distributed.run: [WARNING] master_addr is only used for static rdzv_backend and when rdzv_endpoint is not specified.
+06/18/2024 02:31:42 - INFO - __main__ - Distributed environment: DistributedType.FSDP  Backend: nccl
+Num processes: 8
+Process index: 7
+Local process index: 7
+Device: cuda:7
+
+Mixed precision type: bf16
+
+06/18/2024 02:31:42 - INFO - __main__ - Distributed environment: DistributedType.FSDP  Backend: nccl
+Num processes: 8
+Process index: 6
+Local process index: 6
+Device: cuda:6
+
+Mixed precision type: bf16
+
+06/18/2024 02:31:42 - INFO - __main__ - Distributed environment: DistributedType.FSDP  Backend: nccl
+Num processes: 8
+Process index: 5
+Local process index: 5
+Device: cuda:5
+
+Mixed precision type: bf16
+
+06/18/2024 02:31:42 - INFO - __main__ - Distributed environment: DistributedType.FSDP  Backend: nccl
+Num processes: 8
+Process index: 2
+Local process index: 2
+Device: cuda:2
+
+Mixed precision type: bf16
+
+06/18/2024 02:31:42 - INFO - __main__ - Distributed environment: DistributedType.FSDP  Backend: nccl
+Num processes: 8
+Process index: 4
+Local process index: 4
+Device: cuda:4
+
+Mixed precision type: bf16
+
+06/18/2024 02:31:42 - INFO - __main__ - Distributed environment: DistributedType.FSDP  Backend: nccl
+Num processes: 8
+Process index: 0
+Local process index: 0
+Device: cuda:0
+
+Mixed precision type: bf16
+
+06/18/2024 02:31:42 - INFO - __main__ - Distributed environment: DistributedType.FSDP  Backend: nccl
+Num processes: 8
+Process index: 1
+Local process index: 1
+Device: cuda:1
+
+Mixed precision type: bf16
+
+06/18/2024 02:31:42 - INFO - __main__ - Distributed environment: DistributedType.FSDP  Backend: nccl
+Num processes: 8
+Process index: 3
+Local process index: 3
+Device: cuda:3
+
+Mixed precision type: bf16
+
+loading configuration file /orfeo/cephfs/scratch/area/ddoimo/models/llama_v3/models_hf/llama-3-70b/config.json
+Model config LlamaConfig {
+  "_name_or_path": "/orfeo/cephfs/scratch/area/ddoimo/models/llama_v3/models_hf/llama-3-70b",
+  "architectures": [
+    "LlamaForCausalLM"
+  ],
+  "attention_bias": false,
+  "attention_dropout": 0.0,
+  "bos_token_id": 128000,
+  "eos_token_id": 128001,
+  "hidden_act": "silu",
+  "hidden_size": 8192,
+  "initializer_range": 0.02,
+  "intermediate_size": 28672,
+  "max_position_embeddings": 8192,
+  "model_type": "llama",
+  "num_attention_heads": 64,
+  "num_hidden_layers": 80,
+  "num_key_value_heads": 8,
+  "pretraining_tp": 1,
+  "rms_norm_eps": 1e-05,
+  "rope_scaling": null,
+  "rope_theta": 500000.0,
+  "tie_word_embeddings": false,
+  "torch_dtype": "bfloat16",
+  "transformers_version": "4.40.0",
+  "use_cache": true,
+  "vocab_size": 128256
+}
+
+model_loading started. 
+
+
+loading weights file /orfeo/cephfs/scratch/area/ddoimo/models/llama_v3/models_hf/llama-3-70b/model.safetensors.index.json
+Instantiating LlamaForCausalLM model under default dtype torch.bfloat16.
+The model was loaded with use_flash_attention_2=True, which is deprecated and may be removed in a future release. Please use `attn_implementation="flash_attention_2"` instead.
+You are attempting to use Flash Attention 2.0 with a model not initialized on GPU. Make sure to move the model to GPU after initializing it on CPU with `model.to('cuda')`.
+Generate config GenerationConfig {
+  "bos_token_id": 128000,
+  "eos_token_id": 128001
+}
+
+Loading checkpoint shards:   0%|          | 0/30 [00:00<?, ?it/s]Loading checkpoint shards:   3%|▎         | 1/30 [00:01<00:39,  1.36s/it]Loading checkpoint shards:   7%|▋         | 2/30 [00:03<00:57,  2.04s/it]Loading checkpoint shards:  10%|█         | 3/30 [00:06<00:57,  2.13s/it]Loading checkpoint shards:   0%|          | 0/30 [00:00<?, ?it/s]Loading checkpoint shards:  13%|█▎        | 4/30 [00:07<00:50,  1.93s/it]Loading checkpoint shards:   3%|▎         | 1/30 [00:00<00:06,  4.29it/s]Loading checkpoint shards:   7%|▋         | 2/30 [00:00<00:08,  3.39it/s]Loading checkpoint shards:  10%|█         | 3/30 [00:00<00:07,  3.40it/s]Loading checkpoint shards:  13%|█▎        | 4/30 [00:01<00:06,  3.77it/s]Loading checkpoint shards:  17%|█▋        | 5/30 [00:02<00:15,  1.65it/s]Loading checkpoint shards:  17%|█▋        | 5/30 [00:09<00:50,  2.01s/it]Loading checkpoint shards:   0%|          | 0/30 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 6/30 [00:11<00:45,  1.90s/it]Loading checkpoint shards:  20%|██        | 6/30 [00:04<00:26,  1.08s/it]Loading checkpoint shards:   3%|▎         | 1/30 [00:00<00:13,  2.09it/s]Loading checkpoint shards:   7%|▋         | 2/30 [00:01<00:14,  1.96it/s]Loading checkpoint shards:   0%|          | 0/30 [00:00<?, ?it/s]Loading checkpoint shards:  10%|█         | 3/30 [00:01<00:12,  2.24it/s]Loading checkpoint shards:   3%|▎         | 1/30 [00:00<00:11,  2.43it/s]Loading checkpoint shards:   7%|▋         | 2/30 [00:00<00:07,  3.71it/s]Loading checkpoint shards:  13%|█▎        | 4/30 [00:01<00:11,  2.34it/s]Loading checkpoint shards:  10%|█         | 3/30 [00:00<00:06,  3.95it/s]Loading checkpoint shards:  23%|██▎       | 7/30 [00:05<00:29,  1.27s/it]Loading checkpoint shards:  23%|██▎       | 7/30 [00:13<00:43,  1.91s/it]Loading checkpoint shards:  17%|█▋        | 5/30 [00:02<00:09,  2.62it/s]Loading checkpoint shards:  13%|█▎        | 4/30 [00:01<00:06,  4.27it/s]Loading checkpoint shards:  20%|██        | 6/30 [00:02<00:08,  2.69it/s]Loading checkpoint shards:  17%|█▋        | 5/30 [00:01<00:07,  3.39it/s]Loading checkpoint shards:  23%|██▎       | 7/30 [00:02<00:08,  2.86it/s]Loading checkpoint shards:  20%|██        | 6/30 [00:01<00:07,  3.26it/s]Loading checkpoint shards:   0%|          | 0/30 [00:00<?, ?it/s]Loading checkpoint shards:  23%|██▎       | 7/30 [00:02<00:07,  3.07it/s]Loading checkpoint shards:   3%|▎         | 1/30 [00:00<00:06,  4.17it/s]Loading checkpoint shards:  27%|██▋       | 8/30 [00:15<00:39,  1.78s/it]Loading checkpoint shards:  27%|██▋       | 8/30 [00:03<00:10,  2.05it/s]Loading checkpoint shards:  27%|██▋       | 8/30 [00:07<00:30,  1.37s/it]Loading checkpoint shards:  27%|██▋       | 8/30 [00:02<00:07,  2.98it/s]Loading checkpoint shards:   7%|▋         | 2/30 [00:00<00:05,  4.86it/s]Loading checkpoint shards:  10%|█         | 3/30 [00:00<00:04,  5.83it/s]Loading checkpoint shards:  13%|█▎        | 4/30 [00:00<00:04,  5.73it/s]Loading checkpoint shards:  17%|█▋        | 5/30 [00:00<00:04,  5.65it/s]Loading checkpoint shards:  20%|██        | 6/30 [00:01<00:05,  4.71it/s]Loading checkpoint shards:  23%|██▎       | 7/30 [00:01<00:05,  4.52it/s]Loading checkpoint shards:  27%|██▋       | 8/30 [00:01<00:04,  4.55it/s]Loading checkpoint shards:  30%|███       | 9/30 [00:05<00:18,  1.15it/s]Loading checkpoint shards:  30%|███       | 9/30 [00:02<00:05,  3.77it/s]Loading checkpoint shards:  30%|███       | 9/30 [00:09<00:30,  1.45s/it]Loading checkpoint shards:  30%|███       | 9/30 [00:04<00:15,  1.36it/s]Loading checkpoint shards:  30%|███       | 9/30 [00:16<00:37,  1.80s/it]Loading checkpoint shards:   0%|          | 0/30 [00:00<?, ?it/s]Loading checkpoint shards:   3%|▎         | 1/30 [00:00<00:07,  3.69it/s]Loading checkpoint shards:   7%|▋         | 2/30 [00:00<00:05,  5.07it/s]Loading checkpoint shards:  10%|█         | 3/30 [00:00<00:04,  5.79it/s]Loading checkpoint shards:  33%|███▎      | 10/30 [00:03<00:15,  1.28it/s]Loading checkpoint shards:  33%|███▎      | 10/30 [00:18<00:35,  1.80s/it]Loading checkpoint shards:  33%|███▎      | 10/30 [00:06<00:22,  1.11s/it]Loading checkpoint shards:  33%|███▎      | 10/30 [00:07<00:24,  1.21s/it]Loading checkpoint shards:  33%|███▎      | 10/30 [00:11<00:32,  1.61s/it]Loading checkpoint shards:  13%|█▎        | 4/30 [00:00<00:04,  6.03it/s]Loading checkpoint shards:  17%|█▋        | 5/30 [00:00<00:04,  5.86it/s]Loading checkpoint shards:  20%|██        | 6/30 [00:01<00:03,  6.05it/s]Loading checkpoint shards:  23%|██▎       | 7/30 [00:01<00:03,  6.22it/s]Loading checkpoint shards:  27%|██▋       | 8/30 [00:01<00:03,  6.33it/s]Loading checkpoint shards:   0%|          | 0/30 [00:00<?, ?it/s]Loading checkpoint shards:  30%|███       | 9/30 [00:01<00:03,  6.40it/s]Loading checkpoint shards:   3%|▎         | 1/30 [00:00<00:04,  6.86it/s]Loading checkpoint shards:  33%|███▎      | 10/30 [00:01<00:03,  6.45it/s]Loading checkpoint shards:   7%|▋         | 2/30 [00:00<00:03,  7.49it/s]Loading checkpoint shards:  10%|█         | 3/30 [00:00<00:03,  7.64it/s]Loading checkpoint shards:  13%|█▎        | 4/30 [00:00<00:03,  7.97it/s]Loading checkpoint shards:  17%|█▋        | 5/30 [00:00<00:03,  8.28it/s]Loading checkpoint shards:   0%|          | 0/30 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 6/30 [00:00<00:02,  8.49it/s]Loading checkpoint shards:   3%|▎         | 1/30 [00:00<00:04,  6.82it/s]Loading checkpoint shards:  23%|██▎       | 7/30 [00:00<00:02,  8.64it/s]Loading checkpoint shards:  27%|██▋       | 8/30 [00:00<00:02,  8.73it/s]Loading checkpoint shards:   7%|▋         | 2/30 [00:00<00:03,  7.79it/s]Loading checkpoint shards:  30%|███       | 9/30 [00:01<00:02,  8.80it/s]Loading checkpoint shards:  10%|█         | 3/30 [00:00<00:03,  8.20it/s]Loading checkpoint shards:  33%|███▎      | 10/30 [00:01<00:02,  8.84it/s]Loading checkpoint shards:  13%|█▎        | 4/30 [00:00<00:03,  8.41it/s]Loading checkpoint shards:  17%|█▋        | 5/30 [00:00<00:02,  8.52it/s]Loading checkpoint shards:  20%|██        | 6/30 [00:00<00:02,  8.59it/s]Loading checkpoint shards:  23%|██▎       | 7/30 [00:00<00:02,  8.64it/s]Loading checkpoint shards:  27%|██▋       | 8/30 [00:00<00:02,  8.66it/s]Loading checkpoint shards:  30%|███       | 9/30 [00:01<00:02,  8.56it/s]Loading checkpoint shards:  37%|███▋      | 11/30 [00:08<00:29,  1.56s/it]Loading checkpoint shards:  37%|███▋      | 11/30 [00:03<00:11,  1.67it/s]Loading checkpoint shards:  37%|███▋      | 11/30 [00:09<00:30,  1.63s/it]Loading checkpoint shards:  37%|███▋      | 11/30 [00:13<00:36,  1.91s/it]Loading checkpoint shards:  37%|███▋      | 11/30 [00:21<00:38,  2.05s/it]Loading checkpoint shards:  37%|███▋      | 11/30 [00:06<00:25,  1.35s/it]Loading checkpoint shards:  37%|███▋      | 11/30 [00:01<00:05,  3.56it/s]Loading checkpoint shards:  33%|███▎      | 10/30 [00:01<00:02,  8.55it/s]Loading checkpoint shards:  37%|███▋      | 11/30 [00:01<00:02,  8.62it/s]Loading checkpoint shards:  40%|████      | 12/30 [00:10<00:29,  1.65s/it]Loading checkpoint shards:  40%|████      | 12/30 [00:02<00:10,  1.69it/s]Loading checkpoint shards:  40%|████      | 12/30 [00:05<00:17,  1.02it/s]Loading checkpoint shards:  40%|████      | 12/30 [00:23<00:35,  1.99s/it]Loading checkpoint shards:  40%|████      | 12/30 [00:11<00:30,  1.70s/it]Loading checkpoint shards:  40%|████      | 12/30 [00:15<00:34,  1.89s/it]Loading checkpoint shards:  40%|████      | 12/30 [00:03<00:13,  1.31it/s]Loading checkpoint shards:  40%|████      | 12/30 [00:08<00:27,  1.50s/it]Loading checkpoint shards:  43%|████▎     | 13/30 [00:12<00:30,  1.81s/it]Loading checkpoint shards:  43%|████▎     | 13/30 [00:05<00:18,  1.07s/it]Loading checkpoint shards:  43%|████▎     | 13/30 [00:07<00:22,  1.34s/it]Loading checkpoint shards:  43%|████▎     | 13/30 [00:13<00:31,  1.84s/it]Loading checkpoint shards:  43%|████▎     | 13/30 [00:25<00:34,  2.05s/it]Loading checkpoint shards:  43%|████▎     | 13/30 [00:17<00:33,  1.98s/it]Loading checkpoint shards:  43%|████▎     | 13/30 [00:05<00:20,  1.19s/it]Loading checkpoint shards:  43%|████▎     | 13/30 [00:10<00:29,  1.71s/it]Loading checkpoint shards:  47%|████▋     | 14/30 [00:14<00:30,  1.91s/it]Loading checkpoint shards:  47%|████▋     | 14/30 [00:07<00:22,  1.39s/it]Loading checkpoint shards:  47%|████▋     | 14/30 [00:09<00:25,  1.58s/it]Loading checkpoint shards:  47%|████▋     | 14/30 [00:15<00:30,  1.93s/it]Loading checkpoint shards:  47%|████▋     | 14/30 [00:27<00:33,  2.08s/it]Loading checkpoint shards:  47%|████▋     | 14/30 [00:19<00:32,  2.03s/it]Loading checkpoint shards:  47%|████▋     | 14/30 [00:08<00:23,  1.48s/it]Loading checkpoint shards:  47%|████▋     | 14/30 [00:12<00:29,  1.84s/it]Loading checkpoint shards:  50%|█████     | 15/30 [00:16<00:29,  1.96s/it]Loading checkpoint shards:  50%|█████     | 15/30 [00:09<00:23,  1.60s/it]Loading checkpoint shards:  50%|█████     | 15/30 [00:11<00:25,  1.73s/it]Loading checkpoint shards:  50%|█████     | 15/30 [00:18<00:29,  1.97s/it]Loading checkpoint shards:  50%|█████     | 15/30 [00:29<00:31,  2.07s/it]Loading checkpoint shards:  50%|█████     | 15/30 [00:21<00:30,  2.04s/it]Loading checkpoint shards:  50%|█████     | 15/30 [00:10<00:24,  1.65s/it]Loading checkpoint shards:  50%|█████     | 15/30 [00:14<00:28,  1.91s/it]Loading checkpoint shards:  53%|█████▎    | 16/30 [00:18<00:26,  1.91s/it]Loading checkpoint shards:  53%|█████▎    | 16/30 [00:13<00:24,  1.75s/it]Loading checkpoint shards:  53%|█████▎    | 16/30 [00:11<00:23,  1.67s/it]Loading checkpoint shards:  53%|█████▎    | 16/30 [00:31<00:27,  1.99s/it]Loading checkpoint shards:  53%|█████▎    | 16/30 [00:19<00:26,  1.93s/it]Loading checkpoint shards:  53%|█████▎    | 16/30 [00:23<00:27,  1.97s/it]Loading checkpoint shards:  53%|█████▎    | 16/30 [00:11<00:23,  1.70s/it]Loading checkpoint shards:  53%|█████▎    | 16/30 [00:16<00:26,  1.88s/it]Loading checkpoint shards:  57%|█████▋    | 17/30 [00:20<00:25,  1.93s/it]Loading checkpoint shards:  57%|█████▋    | 17/30 [00:15<00:23,  1.82s/it]Loading checkpoint shards:  57%|█████▋    | 17/30 [00:13<00:22,  1.76s/it]Loading checkpoint shards:  57%|█████▋    | 17/30 [00:21<00:25,  1.94s/it]Loading checkpoint shards:  57%|█████▋    | 17/30 [00:33<00:25,  1.99s/it]Loading checkpoint shards:  57%|█████▋    | 17/30 [00:25<00:25,  1.97s/it]Loading checkpoint shards:  57%|█████▋    | 17/30 [00:13<00:23,  1.79s/it]Loading checkpoint shards:  57%|█████▋    | 17/30 [00:18<00:24,  1.91s/it]Loading checkpoint shards:  60%|██████    | 18/30 [00:22<00:24,  2.04s/it]Loading checkpoint shards:  60%|██████    | 18/30 [00:15<00:23,  1.92s/it]Loading checkpoint shards:  60%|██████    | 18/30 [00:17<00:23,  1.97s/it]Loading checkpoint shards:  60%|██████    | 18/30 [00:24<00:24,  2.05s/it]Loading checkpoint shards:  60%|██████    | 18/30 [00:35<00:24,  2.08s/it]Loading checkpoint shards:  60%|██████    | 18/30 [00:28<00:24,  2.07s/it]Loading checkpoint shards:  60%|██████    | 18/30 [00:16<00:23,  1.94s/it]Loading checkpoint shards:  60%|██████    | 18/30 [00:20<00:24,  2.03s/it]Loading checkpoint shards:  63%|██████▎   | 19/30 [00:25<00:24,  2.19s/it]Loading checkpoint shards:  63%|██████▎   | 19/30 [00:17<00:23,  2.10s/it]Loading checkpoint shards:  63%|██████▎   | 19/30 [00:20<00:23,  2.13s/it]Loading checkpoint shards:  63%|██████▎   | 19/30 [00:26<00:24,  2.19s/it]Loading checkpoint shards:  63%|██████▎   | 19/30 [00:38<00:24,  2.22s/it]Loading checkpoint shards:  63%|██████▎   | 19/30 [00:30<00:24,  2.21s/it]Loading checkpoint shards:  63%|██████▎   | 19/30 [00:18<00:23,  2.12s/it]Loading checkpoint shards:  63%|██████▎   | 19/30 [00:23<00:23,  2.18s/it]Loading checkpoint shards:  67%|██████▋   | 20/30 [00:27<00:22,  2.23s/it]Loading checkpoint shards:  67%|██████▋   | 20/30 [00:20<00:21,  2.17s/it]Loading checkpoint shards:  67%|██████▋   | 20/30 [00:22<00:21,  2.20s/it]Loading checkpoint shards:  67%|██████▋   | 20/30 [00:28<00:22,  2.24s/it]Loading checkpoint shards:  67%|██████▋   | 20/30 [00:40<00:22,  2.25s/it]Loading checkpoint shards:  67%|██████▋   | 20/30 [00:32<00:22,  2.25s/it]Loading checkpoint shards:  67%|██████▋   | 20/30 [00:21<00:21,  2.18s/it]Loading checkpoint shards:  67%|██████▋   | 20/30 [00:25<00:22,  2.23s/it]Loading checkpoint shards:  70%|███████   | 21/30 [00:29<00:18,  2.11s/it]Loading checkpoint shards:  70%|███████   | 21/30 [00:22<00:18,  2.07s/it]Loading checkpoint shards:  70%|███████   | 21/30 [00:24<00:18,  2.08s/it]Loading checkpoint shards:  70%|███████   | 21/30 [00:30<00:19,  2.11s/it]Loading checkpoint shards:  70%|███████   | 21/30 [00:42<00:19,  2.12s/it]Loading checkpoint shards:  70%|███████   | 21/30 [00:34<00:19,  2.12s/it]Loading checkpoint shards:  70%|███████   | 21/30 [00:22<00:18,  2.07s/it]Loading checkpoint shards:  70%|███████   | 21/30 [00:27<00:18,  2.10s/it]Loading checkpoint shards:  73%|███████▎  | 22/30 [00:31<00:17,  2.15s/it]Loading checkpoint shards:  73%|███████▎  | 22/30 [00:24<00:16,  2.12s/it]Loading checkpoint shards:  73%|███████▎  | 22/30 [00:26<00:17,  2.13s/it]Loading checkpoint shards:  73%|███████▎  | 22/30 [00:36<00:17,  2.15s/it]Loading checkpoint shards:  73%|███████▎  | 22/30 [00:33<00:17,  2.15s/it]Loading checkpoint shards:  73%|███████▎  | 22/30 [00:29<00:17,  2.14s/it]Loading checkpoint shards:  73%|███████▎  | 22/30 [00:25<00:16,  2.12s/it]Loading checkpoint shards:  73%|███████▎  | 22/30 [00:44<00:17,  2.16s/it]Loading checkpoint shards:  77%|███████▋  | 23/30 [00:33<00:14,  2.12s/it]Loading checkpoint shards:  77%|███████▋  | 23/30 [00:26<00:14,  2.10s/it]Loading checkpoint shards:  77%|███████▋  | 23/30 [00:28<00:14,  2.11s/it]Loading checkpoint shards:  77%|███████▋  | 23/30 [00:39<00:14,  2.13s/it]Loading checkpoint shards:  77%|███████▋  | 23/30 [00:35<00:14,  2.12s/it]Loading checkpoint shards:  77%|███████▋  | 23/30 [00:31<00:14,  2.12s/it]Loading checkpoint shards:  77%|███████▋  | 23/30 [00:27<00:14,  2.10s/it]Loading checkpoint shards:  77%|███████▋  | 23/30 [00:46<00:14,  2.13s/it]Loading checkpoint shards:  80%|████████  | 24/30 [00:36<00:13,  2.22s/it]Loading checkpoint shards:  80%|████████  | 24/30 [00:28<00:13,  2.20s/it]Loading checkpoint shards:  80%|████████  | 24/30 [00:31<00:13,  2.21s/it]Loading checkpoint shards:  80%|████████  | 24/30 [00:37<00:13,  2.22s/it]Loading checkpoint shards:  80%|████████  | 24/30 [00:41<00:13,  2.22s/it]Loading checkpoint shards:  80%|████████  | 24/30 [00:34<00:13,  2.21s/it]Loading checkpoint shards:  80%|████████  | 24/30 [00:29<00:13,  2.20s/it]Loading checkpoint shards:  80%|████████  | 24/30 [00:49<00:13,  2.22s/it]Loading checkpoint shards:  83%|████████▎ | 25/30 [00:38<00:11,  2.34s/it]Loading checkpoint shards:  83%|████████▎ | 25/30 [00:31<00:11,  2.33s/it]Loading checkpoint shards:  83%|████████▎ | 25/30 [00:33<00:11,  2.33s/it]Loading checkpoint shards:  83%|████████▎ | 25/30 [00:44<00:11,  2.34s/it]Loading checkpoint shards:  83%|████████▎ | 25/30 [00:40<00:11,  2.34s/it]Loading checkpoint shards:  83%|████████▎ | 25/30 [00:36<00:11,  2.34s/it]Loading checkpoint shards:  83%|████████▎ | 25/30 [00:32<00:11,  2.33s/it]Loading checkpoint shards:  83%|████████▎ | 25/30 [00:51<00:11,  2.34s/it]Loading checkpoint shards:  87%|████████▋ | 26/30 [00:40<00:08,  2.19s/it]Loading checkpoint shards:  87%|████████▋ | 26/30 [00:33<00:08,  2.19s/it]Loading checkpoint shards:  87%|████████▋ | 26/30 [00:35<00:08,  2.19s/it]Loading checkpoint shards:  87%|████████▋ | 26/30 [00:45<00:08,  2.20s/it]Loading checkpoint shards:  87%|████████▋ | 26/30 [00:42<00:08,  2.19s/it]Loading checkpoint shards:  87%|████████▋ | 26/30 [00:38<00:08,  2.19s/it]Loading checkpoint shards:  87%|████████▋ | 26/30 [00:34<00:08,  2.19s/it]Loading checkpoint shards:  87%|████████▋ | 26/30 [00:53<00:08,  2.20s/it]Loading checkpoint shards:  90%|█████████ | 27/30 [00:43<00:06,  2.20s/it]Loading checkpoint shards:  90%|█████████ | 27/30 [00:35<00:06,  2.20s/it]Loading checkpoint shards:  90%|█████████ | 27/30 [00:37<00:06,  2.20s/it]Loading checkpoint shards:  90%|█████████ | 27/30 [00:44<00:06,  2.20s/it]Loading checkpoint shards:  90%|█████████ | 27/30 [00:55<00:06,  2.20s/it]Loading checkpoint shards:  90%|█████████ | 27/30 [00:41<00:06,  2.20s/it]Loading checkpoint shards:  90%|█████████ | 27/30 [00:48<00:06,  2.21s/it]Loading checkpoint shards:  90%|█████████ | 27/30 [00:36<00:06,  2.20s/it]Loading checkpoint shards:  93%|█████████▎| 28/30 [00:44<00:03,  1.98s/it]Loading checkpoint shards:  93%|█████████▎| 28/30 [00:37<00:03,  1.97s/it]Loading checkpoint shards:  93%|█████████▎| 28/30 [00:39<00:03,  1.98s/it]Loading checkpoint shards:  93%|█████████▎| 28/30 [00:45<00:03,  1.98s/it]Loading checkpoint shards:  93%|█████████▎| 28/30 [00:42<00:03,  1.98s/it]Loading checkpoint shards:  93%|█████████▎| 28/30 [00:49<00:03,  1.98s/it]Loading checkpoint shards:  93%|█████████▎| 28/30 [00:37<00:03,  1.98s/it]Loading checkpoint shards:  93%|█████████▎| 28/30 [00:57<00:03,  1.98s/it]Loading checkpoint shards:  97%|█████████▋| 29/30 [00:46<00:01,  1.90s/it]Loading checkpoint shards:  97%|█████████▋| 29/30 [00:38<00:01,  1.90s/it]Loading checkpoint shards:  97%|█████████▋| 29/30 [00:40<00:01,  1.90s/it]Loading checkpoint shards:  97%|█████████▋| 29/30 [00:47<00:01,  1.90s/it]Loading checkpoint shards:  97%|█████████▋| 29/30 [00:44<00:01,  1.90s/it]Loading checkpoint shards:  97%|█████████▋| 29/30 [00:51<00:01,  1.90s/it]Loading checkpoint shards:  97%|█████████▋| 29/30 [00:39<00:01,  1.90s/it]Loading checkpoint shards:  97%|█████████▋| 29/30 [00:58<00:01,  1.90s/it]Loading checkpoint shards: 100%|██████████| 30/30 [00:46<00:00,  1.38s/it]Loading checkpoint shards: 100%|██████████| 30/30 [00:46<00:00,  1.55s/it]
+Loading checkpoint shards: 100%|██████████| 30/30 [00:38<00:00,  1.38s/it]Loading checkpoint shards: 100%|██████████| 30/30 [00:38<00:00,  1.30s/it]
+Loading checkpoint shards: 100%|██████████| 30/30 [00:41<00:00,  1.38s/it]Loading checkpoint shards: 100%|██████████| 30/30 [00:41<00:00,  1.37s/it]
+Loading checkpoint shards: 100%|██████████| 30/30 [00:47<00:00,  1.38s/it]Loading checkpoint shards: 100%|██████████| 30/30 [00:47<00:00,  1.59s/it]
+Loading checkpoint shards: 100%|██████████| 30/30 [00:44<00:00,  1.38s/it]Loading checkpoint shards: 100%|██████████| 30/30 [00:44<00:00,  1.48s/it]
+Loading checkpoint shards: 100%|██████████| 30/30 [00:51<00:00,  1.38s/it]Loading checkpoint shards: 100%|██████████| 30/30 [00:51<00:00,  1.72s/it]
+All model checkpoint weights were used when initializing LlamaForCausalLM.
+
+All the weights of LlamaForCausalLM were initialized from the model checkpoint at /orfeo/cephfs/scratch/area/ddoimo/models/llama_v3/models_hf/llama-3-70b.
+If your task is similar to the task the model of the checkpoint was trained on, you can already use LlamaForCausalLM for predictions without further training.
+Loading checkpoint shards: 100%|██████████| 30/30 [00:39<00:00,  1.38s/it]Loading checkpoint shards: 100%|██████████| 30/30 [00:39<00:00,  1.32s/it]
+Loading checkpoint shards: 100%|██████████| 30/30 [00:59<00:00,  1.38s/it]Loading checkpoint shards: 100%|██████████| 30/30 [00:59<00:00,  1.97s/it]
+loading configuration file /orfeo/cephfs/scratch/area/ddoimo/models/llama_v3/models_hf/llama-3-70b/generation_config.json
+Generate config GenerationConfig {
+  "bos_token_id": 128000,
+  "eos_token_id": 128001
+}
+
+model loading finished. 
+
+
+Initializing LORA model...
+trainable params: 828,375,040 || all params: 71,382,081,536 || trainable%: 1.160480364504679
+loading file tokenizer.json
+loading file added_tokens.json
+loading file special_tokens_map.json
+loading file tokenizer_config.json
+Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+max_seq_len:  2048
+loading dataset
+split: train
+mode: dev+validation
+
+tokenization started
+tokenization finished
+num_samples = 1065
+loading dataset
+split: validation
+mode: validation
+
+tokenization started
+tokenization finished
+loading dataset
+split: test
+mode: test
+
+tokenization started
+tokenization finished
+memory consumed before loading model
+CUDA mem allocated: 9.5367431640625e-07 GB
+CUDA mem reserved: 0.001953125 GB
+memory consumed after loading model
+CUDA mem allocated: 24.760630130767822 GB
+CUDA mem reserved: 29.80859375 GB
+preparing activation checkpointing..
+setup scheduler and optimizer..
+measuring baselines..
+measuring validation accuracy
+993/ 1531 inputs processed
+inference throughput:  103.17 token/sec/gpu
+06/18/2024 02:55:14 - INFO - __main__ - iter 0. mmlu val accuracy: macro 0.7682, micro 0.7421
+start training
+memory before train run
+CUDA mem allocated: 24.760630130767822 GB
+CUDA mem reserved: 29.80859375 GB
+06/18/2024 02:55:14 - INFO - __main__ - ***** Running training *****
+06/18/2024 02:55:14 - INFO - __main__ -   Num examples = 1065
+06/18/2024 02:55:14 - INFO - __main__ -   Num Epochs = 4
+06/18/2024 02:55:14 - INFO - __main__ -   Learning rate = 0.0001
+06/18/2024 02:55:14 - INFO - __main__ -   Weight Decay = 1e-05
+06/18/2024 02:55:14 - INFO - __main__ -   Lora Rank = 64
+06/18/2024 02:55:14 - INFO - __main__ -   Lora Alpha = 16.0
+06/18/2024 02:55:14 - INFO - __main__ -   Lora Dropout = 0.1
+06/18/2024 02:55:14 - INFO - __main__ -   Batch size per device = 1
+06/18/2024 02:55:14 - INFO - __main__ -   Total batch size (w. parallel, distributed & accumulation) = 16
+06/18/2024 02:55:14 - INFO - __main__ -   Gradient Accumulation steps = 2
+06/18/2024 02:55:14 - INFO - __main__ -   len_dataloader = 133
+06/18/2024 02:55:14 - INFO - __main__ -   Total optimization steps = 268
+06/18/2024 02:55:14 - INFO - __main__ -   Warmup steps = 13
+06/18/2024 02:55:14 - INFO - __main__ -   Log steps number = 21
+log step: 13/260
+LR: 0.0001, Loss: 0.2946135447575496,                             Time: 0 h  1.58 min
+log step: 26/260
+LR: 9.936649105790168e-05, Loss: 0.3421170894916241,                             Time: 0 h  3.07 min
+measuring validation accuracy
+993/ 1531 inputs processed
+inference throughput:  104.79 token/sec/gpu
+06/18/2024 03:02:03 - INFO - __main__ - iter 27. mmlu val accuracy: macro 0.7983, micro 0.7572
+CUDA mem allocated: 26.885592937469482 GB
+CUDA mem reserved: 29.80859375 GB
+log step: 39/260
+LR: 9.748217972977712e-05, Loss: 0.2988269512469952,                             Time: 0 h  4.56 min
+log step: 52/260
+LR: 9.439529745304307e-05, Loss: 0.2805125346550575,                             Time: 0 h  6.04 min
+measuring validation accuracy
+993/ 1531 inputs processed
+inference throughput:  105.01 token/sec/gpu
+06/18/2024 03:08:47 - INFO - __main__ - iter 54. mmlu val accuracy: macro 0.8068, micro 0.7611
+CUDA mem allocated: 27.354118824005127 GB
+CUDA mem reserved: 30.091796875 GB
+log step: 65/260
+LR: 9.01848570570133e-05, Loss: 0.27737696354205793,                             Time: 0 h  7.53 min
+processed  27.18 token/sec/gpu
+measuring test accuracy
+993/ 14042 inputs processed
+1993/ 14042 inputs processed
+2993/ 14042 inputs processed
+3993/ 14042 inputs processed
+4993/ 14042 inputs processed
+5993/ 14042 inputs processed
+6993/ 14042 inputs processed
+7993/ 14042 inputs processed
+8993/ 14042 inputs processed
+9993/ 14042 inputs processed
+10993/ 14042 inputs processed
+11993/ 14042 inputs processed
+12993/ 14042 inputs processed
+13993/ 14042 inputs processed
+inference throughput:  104.42 token/sec/gpu
+06/18/2024 03:43:31 - INFO - __main__ - mmlu test accuracy after epoch 0: macro 0.7757, micro 0.7645
+CUDA mem allocated: 27.354118824005127 GB
+CUDA mem reserved: 30.091796875 GB
+/orfeo/cephfs/scratch/area/ddoimo/finetuning_llm/open-instruct/env_amd_new/lib/python3.11/site-packages/peft/utils/save_and_load.py:154: UserWarning: Could not find a config file in /orfeo/cephfs/scratch/area/ddoimo/models/llama_v3/models_hf/llama-3-70b - will assume that the vocabulary was not modified.
+  warnings.warn(
+log step: 78/260
+LR: 8.495863032516487e-05, Loss: 0.25219024144686186,                             Time: 0 h  9.12 min
+measuring validation accuracy
+993/ 1531 inputs processed
+inference throughput:  104.53 token/sec/gpu
+06/18/2024 03:50:38 - INFO - __main__ - iter 81. mmlu val accuracy: macro 0.8527, micro 0.8069
+CUDA mem allocated: 27.354118824005127 GB
+CUDA mem reserved: 31.576171875 GB
+log step: 91/260
+LR: 7.885038943398501e-05, Loss: 0.20476365089416504,                             Time: 0 h  10.62 min
+log step: 104/260
+LR: 7.201648287741528e-05, Loss: 0.1274252304664025,                             Time: 0 h  12.10 min
+measuring validation accuracy
+993/ 1531 inputs processed
+inference throughput:  104.76 token/sec/gpu
+06/18/2024 03:57:23 - INFO - __main__ - iter 108. mmlu val accuracy: macro 0.8685, micro 0.8096
+CUDA mem allocated: 27.354118824005127 GB
+CUDA mem reserved: 31.576171875 GB
+log step: 117/260
+LR: 6.463183352062944e-05, Loss: 0.19555915319002593,                             Time: 0 h  13.63 min
+log step: 130/260
+LR: 5.6885461218245075e-05, Loss: 0.08375309980832614,                             Time: 0 h  15.14 min
+processed  13.51 token/sec/gpu
+measuring test accuracy
+993/ 14042 inputs processed
+1993/ 14042 inputs processed
+2993/ 14042 inputs processed
+3993/ 14042 inputs processed
+4993/ 14042 inputs processed
+5993/ 14042 inputs processed
+6993/ 14042 inputs processed
+7993/ 14042 inputs processed
+8993/ 14042 inputs processed
+9993/ 14042 inputs processed
+10993/ 14042 inputs processed
+11993/ 14042 inputs processed
+12993/ 14042 inputs processed
+13993/ 14042 inputs processed
+inference throughput:  104.43 token/sec/gpu
+06/18/2024 04:33:38 - INFO - __main__ - mmlu test accuracy after epoch 1: macro 0.7772, micro 0.7665
+CUDA mem allocated: 27.354118824005127 GB
+CUDA mem reserved: 31.576171875 GB
+measuring validation accuracy
+993/ 1531 inputs processed
+inference throughput:  104.38 token/sec/gpu
+06/18/2024 04:39:25 - INFO - __main__ - iter 135. mmlu val accuracy: macro 0.8984, micro 0.8488
+CUDA mem allocated: 27.354118824005127 GB
+CUDA mem reserved: 31.576171875 GB
+log step: 143/260
+LR: 4.897564460146958e-05, Loss: 0.15322639391972467,                             Time: 0 h  16.75 min
+log step: 156/260
+LR: 4.110484587462962e-05, Loss: 0.07403111457824707,                             Time: 0 h  18.26 min
+measuring validation accuracy
+993/ 1531 inputs processed
+inference throughput:  104.41 token/sec/gpu
+06/18/2024 04:46:12 - INFO - __main__ - iter 162. mmlu val accuracy: macro 0.9137, micro 0.8573
+CUDA mem allocated: 27.354118824005127 GB
+CUDA mem reserved: 31.576171875 GB
+log step: 169/260
+LR: 3.347452852762056e-05, Loss: 0.04637780097814707,                             Time: 0 h  19.78 min
+log step: 182/260
+LR: 2.628000061177079e-05, Loss: 0.03417235612869263,                             Time: 0 h  21.28 min
+measuring validation accuracy
+993/ 1531 inputs processed
+inference throughput:  104.83 token/sec/gpu
+06/18/2024 04:52:59 - INFO - __main__ - iter 189. mmlu val accuracy: macro 0.9204, micro 0.8652
+CUDA mem allocated: 27.354118824005127 GB
+CUDA mem reserved: 31.576171875 GB
+log step: 195/260
+LR: 1.970541557228705e-05, Loss: 0.05508080812600943,                             Time: 0 h  22.79 min
+processed  8.98 token/sec/gpu
+measuring test accuracy
+993/ 14042 inputs processed
+1993/ 14042 inputs processed
+2993/ 14042 inputs processed
+3993/ 14042 inputs processed
+4993/ 14042 inputs processed
+5993/ 14042 inputs processed
+6993/ 14042 inputs processed
+7993/ 14042 inputs processed
+8993/ 14042 inputs processed
+9993/ 14042 inputs processed
+10993/ 14042 inputs processed
+11993/ 14042 inputs processed
+12993/ 14042 inputs processed
+13993/ 14042 inputs processed
+inference throughput:  104.40 token/sec/gpu
+06/18/2024 05:27:29 - INFO - __main__ - mmlu test accuracy after epoch 2: macro 0.7799, micro 0.7750
+CUDA mem allocated: 27.354118824005127 GB
+CUDA mem reserved: 31.576171875 GB
+log step: 208/260
+LR: 1.391905859757738e-05, Loss: 0.06976144588910617,                             Time: 0 h  24.43 min
+measuring validation accuracy
+993/ 1531 inputs processed
+inference throughput:  104.26 token/sec/gpu
+06/18/2024 05:35:05 - INFO - __main__ - iter 216. mmlu val accuracy: macro 0.9259, micro 0.8691
+CUDA mem allocated: 27.354118824005127 GB
+CUDA mem reserved: 31.576171875 GB
+log step: 221/260
+LR: 9.069039137567103e-06, Loss: 0.018837175690210782,                             Time: 0 h  25.96 min
+log step: 234/260
+LR: 5.279499846691252e-06, Loss: 0.01259229274896475,                             Time: 0 h  27.47 min
+measuring validation accuracy
+993/ 1531 inputs processed
+inference throughput:  104.26 token/sec/gpu
+06/18/2024 05:41:54 - INFO - __main__ - iter 243. mmlu val accuracy: macro 0.9273, micro 0.8678
+CUDA mem allocated: 27.354118824005127 GB
+CUDA mem reserved: 31.576171875 GB
+log step: 247/260
+LR: 2.6474389886752223e-06, Loss: 0.001352601612989719,                             Time: 0 h  29.00 min
+log step: 260/260
+LR: 1.2402276378503107e-06, Loss: 0.0466305109170767,                             Time: 0 h  30.50 min
+processed  6.70 token/sec/gpu
+measuring test accuracy
+993/ 14042 inputs processed
+1993/ 14042 inputs processed
+2993/ 14042 inputs processed
+3993/ 14042 inputs processed
+4993/ 14042 inputs processed
+5993/ 14042 inputs processed
+6993/ 14042 inputs processed
+7993/ 14042 inputs processed
+8993/ 14042 inputs processed
+9993/ 14042 inputs processed
+10993/ 14042 inputs processed
+11993/ 14042 inputs processed
+12993/ 14042 inputs processed
+13993/ 14042 inputs processed
+inference throughput:  104.14 token/sec/gpu
+06/18/2024 06:17:53 - INFO - __main__ - mmlu test accuracy after epoch 3: macro 0.7792, micro 0.7745
+CUDA mem allocated: 27.354118824005127 GB
+CUDA mem reserved: 31.576171875 GB

@@ -3,12 +3,12 @@
 #SBATCH --account=lade
 ##SBATCH --nodelist=dgx002
 #SBATCH --nodes=1
-#SBATCH --time=100:00:00            
+#SBATCH --time=20:00:00            
 #SBATCH --ntasks-per-node=1       
-#SBATCH --cpus-per-task=32           
-#SBATCH --mem=100G  #it is intended per node          
+#SBATCH --cpus-per-task=128          
+#SBATCH --mem=600G  #it is intended per node          
 #SBATCH --job-name=test
-#SBATCH --gres=gpu:1 #it is intended per node
+#SBATCH --gres=gpu:8 #it is intended per node
 
 source /u/area/ddoimo/anaconda3/bin/activate ./env_amd_new
 
@@ -18,9 +18,8 @@ export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 TOTAL_BATCH_SIZE=16
 BATCH_SIZE_PER_GPU=1
 
-
+model_name="llama-3-70b"
 samples_per_subject=40
-model_name="llama-3-8b"
 folder="llama_v3"
 
 #model_name="mistral-1-7b"
@@ -34,7 +33,7 @@ head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
 srun torchrun \
     --nnodes=$SLURM_NTASKS \
     --node-rank=$SLURM_NODEID \
-    --nproc-per-node=1 \
+    --nproc-per-node=8 \
     --rdzv-id=$SLURM_PROCID \
     --rdzv-backend=c10d \
     --rdzv-endpoint=$head_node:0 \
@@ -58,7 +57,7 @@ srun torchrun \
     --learning_rate 2e-4 \
     --lr_scheduler_type cosine \
     --warmup_ratio 0.05 \
-    --weight_decay 0. \
+    --weight_decay 1e-5  \
     --num_train_epochs 4 \
     --output_dir "./results/fsdp_test/${model_name}/" \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
@@ -67,7 +66,9 @@ srun torchrun \
     --checkpointing_steps 10 \
     --logging_steps 20 \
     --eval_steps 10 \
-    --activation_checkpointing \
     --use_flash_attn \
-    --measure_baselines
+    --measure_baselines \
+    --activation_checkpointing \
+    #--use_dora \
     #--save_checkpoint
+    #--activation_checkpointing \

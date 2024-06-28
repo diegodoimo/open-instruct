@@ -1,0 +1,252 @@
+[2024-06-16 22:02:58,910] torch.distributed.run: [WARNING] master_addr is only used for static rdzv_backend and when rdzv_endpoint is not specified.
+06/16/2024 22:03:03 - INFO - __main__ - Distributed environment: DistributedType.FSDP  Backend: nccl
+Num processes: 2
+Process index: 0
+Local process index: 0
+Device: cuda:0
+
+Mixed precision type: bf16
+
+06/16/2024 22:03:03 - INFO - __main__ - Distributed environment: DistributedType.FSDP  Backend: nccl
+Num processes: 2
+Process index: 1
+Local process index: 1
+Device: cuda:1
+
+Mixed precision type: bf16
+
+loading configuration file /orfeo/cephfs/scratch/area/ddoimo/models/llama_v3/models_hf/llama-3-8b/config.json
+Model config LlamaConfig {
+  "_name_or_path": "/orfeo/cephfs/scratch/area/ddoimo/models/llama_v3/models_hf/llama-3-8b",
+  "architectures": [
+    "LlamaForCausalLM"
+  ],
+  "attention_bias": false,
+  "attention_dropout": 0.0,
+  "bos_token_id": 128000,
+  "eos_token_id": 128001,
+  "hidden_act": "silu",
+  "hidden_size": 4096,
+  "initializer_range": 0.02,
+  "intermediate_size": 14336,
+  "max_position_embeddings": 8192,
+  "model_type": "llama",
+  "num_attention_heads": 32,
+  "num_hidden_layers": 32,
+  "num_key_value_heads": 8,
+  "pretraining_tp": 1,
+  "rms_norm_eps": 1e-05,
+  "rope_scaling": null,
+  "rope_theta": 500000.0,
+  "tie_word_embeddings": false,
+  "torch_dtype": "bfloat16",
+  "transformers_version": "4.40.0",
+  "use_cache": true,
+  "vocab_size": 128256
+}
+
+model_loading started. 
+
+
+loading weights file /orfeo/cephfs/scratch/area/ddoimo/models/llama_v3/models_hf/llama-3-8b/model.safetensors.index.json
+Instantiating LlamaForCausalLM model under default dtype torch.bfloat16.
+The model was loaded with use_flash_attention_2=True, which is deprecated and may be removed in a future release. Please use `attn_implementation="flash_attention_2"` instead.
+You are attempting to use Flash Attention 2.0 with a model not initialized on GPU. Make sure to move the model to GPU after initializing it on CPU with `model.to('cuda')`.
+Generate config GenerationConfig {
+  "bos_token_id": 128000,
+  "eos_token_id": 128001
+}
+
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:00,  6.98it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:00,  6.96it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:00<00:00,  7.83it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:00<00:00,  7.81it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:00<00:00,  8.15it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:00<00:00,  8.13it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:00<00:00,  8.49it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:00<00:00,  8.21it/s]
+All model checkpoint weights were used when initializing LlamaForCausalLM.
+
+All the weights of LlamaForCausalLM were initialized from the model checkpoint at /orfeo/cephfs/scratch/area/ddoimo/models/llama_v3/models_hf/llama-3-8b.
+If your task is similar to the task the model of the checkpoint was trained on, you can already use LlamaForCausalLM for predictions without further training.
+loading configuration file /orfeo/cephfs/scratch/area/ddoimo/models/llama_v3/models_hf/llama-3-8b/generation_config.json
+Generate config GenerationConfig {
+  "bos_token_id": 128000,
+  "eos_token_id": 128001
+}
+
+model loading finished. 
+
+
+Initializing LORA model...
+Loading checkpoint shards: 100%|██████████| 4/4 [00:00<00:00,  8.45it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:00<00:00,  8.18it/s]
+trainable params: 167,772,160 || all params: 8,198,033,408 || trainable%: 2.0464927580836716
+loading file tokenizer.json
+loading file added_tokens.json
+loading file special_tokens_map.json
+loading file tokenizer_config.json
+Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+max_seq_len:  2048
+loading dataset
+split: train
+mode: dev+validation
+
+tokenization started
+tokenization finished
+num_samples = 1065
+loading dataset
+split: validation
+mode: validation
+
+tokenization started
+tokenization finished
+loading dataset
+split: test
+mode: test
+
+tokenization started
+tokenization finished
+memory consumed before loading model
+CUDA mem allocated: 9.5367431640625e-07 GB
+CUDA mem reserved: 0.001953125 GB
+memory consumed after loading model
+CUDA mem allocated: 11.674107074737549 GB
+CUDA mem reserved: 14.181640625 GB
+preparing activation checkpointing..
+setup scheduler and optimizer..
+measuring baselines..
+measuring validation accuracy
+06/16/2024 22:07:14 - INFO - __main__ - iter 0. mmlu val accuracy: 0.6359
+start training
+memory before train run
+CUDA mem allocated: 11.674107074737549 GB
+CUDA mem reserved: 14.181640625 GB
+06/16/2024 22:07:15 - INFO - __main__ - ***** Running training *****
+06/16/2024 22:07:15 - INFO - __main__ -   Num examples = 1065
+06/16/2024 22:07:15 - INFO - __main__ -   Num Epochs = 4
+06/16/2024 22:07:15 - INFO - __main__ -   len_dataloader = 532
+06/16/2024 22:07:15 - INFO - __main__ -   Instantaneous batch size per device = 1
+06/16/2024 22:07:15 - INFO - __main__ -   Total train batch size (w. parallel, distributed & accumulation) = 16
+06/16/2024 22:07:15 - INFO - __main__ -   Gradient Accumulation steps = 8
+06/16/2024 22:07:15 - INFO - __main__ -   Total optimization steps = 268
+06/16/2024 22:07:15 - INFO - __main__ -   Warmup steps = 13
+06/16/2024 22:07:15 - INFO - __main__ -   Log steps number = 21
+log step: 13/260
+LR: 0.0002, Loss: 0.11884679244114803,                             Time:  0.00 h  1.70 min
+log step: 26/260
+LR: 0.00019873298211580336, Loss: 0.12799752675569975,                             Time:  0.00 h  3.36 min
+measuring validation accuracy
+06/16/2024 22:14:06 - INFO - __main__ - iter 27. mmlu val accuracy: 0.6626
+CUDA mem allocated: 11.86661672592163 GB
+CUDA mem reserved: 14.181640625 GB
+log step: 39/260
+LR: 0.00019496435945955424, Loss: 0.11073041879213773,                             Time:  0.00 h  4.99 min
+log step: 52/260
+LR: 0.00018879059490608613, Loss: 0.10447190358088566,                             Time:  0.00 h  6.62 min
+measuring validation accuracy
+06/16/2024 22:20:52 - INFO - __main__ - iter 54. mmlu val accuracy: 0.7509
+CUDA mem allocated: 12.367172718048096 GB
+CUDA mem reserved: 14.181640625 GB
+log step: 65/260
+LR: 0.0001803697141140266, Loss: 0.10515721027667706,                             Time:  0.00 h  8.25 min
+processed 198.25903660887957 token/sec
+measuring test accuracy
+1000/ 14042 inputs processed
+2000/ 14042 inputs processed
+3000/ 14042 inputs processed
+4000/ 14042 inputs processed
+5000/ 14042 inputs processed
+6000/ 14042 inputs processed
+7000/ 14042 inputs processed
+06/16/2024 22:53:31 - INFO - __main__ - mmlu test accuracy after epoch 0: 0.6327
+CUDA mem allocated: 12.367172718048096 GB
+CUDA mem reserved: 14.181640625 GB
+/orfeo/cephfs/scratch/area/ddoimo/finetuning_llm/open-instruct/env_amd_new/lib/python3.11/site-packages/peft/utils/save_and_load.py:154: UserWarning: Could not find a config file in /orfeo/cephfs/scratch/area/ddoimo/models/llama_v3/models_hf/llama-3-8b - will assume that the vocabulary was not modified.
+  warnings.warn(
+log step: 78/260
+LR: 0.00016991726065032975, Loss: 0.08568480381598839,                             Time:  0.00 h  9.94 min
+measuring validation accuracy
+06/16/2024 22:59:01 - INFO - __main__ - iter 81. mmlu val accuracy: 0.7864
+CUDA mem allocated: 12.367172718048096 GB
+CUDA mem reserved: 14.181640625 GB
+log step: 91/260
+LR: 0.00015770077886797002, Loss: 0.08444083653963529,                             Time:  0.00 h  11.59 min
+log step: 104/260
+LR: 0.00014403296575483056, Loss: 0.03146624565124512,                             Time:  0.00 h  13.23 min
+measuring validation accuracy
+06/16/2024 23:05:48 - INFO - __main__ - iter 108. mmlu val accuracy: 0.7606
+CUDA mem allocated: 12.367172718048096 GB
+CUDA mem reserved: 14.181640625 GB
+log step: 117/260
+LR: 0.00012926366704125888, Loss: 0.08942547211280236,                             Time:  0.00 h  14.86 min
+log step: 130/260
+LR: 0.00011377092243649015, Loss: 0.054800753410045915,                             Time:  0.00 h  16.50 min
+processed 297.5416323029159 token/sec
+measuring test accuracy
+1000/ 14042 inputs processed
+2000/ 14042 inputs processed
+3000/ 14042 inputs processed
+4000/ 14042 inputs processed
+5000/ 14042 inputs processed
+6000/ 14042 inputs processed
+7000/ 14042 inputs processed
+06/16/2024 23:39:56 - INFO - __main__ - mmlu test accuracy after epoch 1: 0.6387
+CUDA mem allocated: 12.367172718048096 GB
+CUDA mem reserved: 14.181640625 GB
+measuring validation accuracy
+06/16/2024 23:43:53 - INFO - __main__ - iter 135. mmlu val accuracy: 0.8120
+CUDA mem allocated: 12.367172718048096 GB
+CUDA mem reserved: 14.181640625 GB
+log step: 143/260
+LR: 9.795128920293916e-05, Loss: 0.04031183169438289,                             Time:  0.00 h  18.16 min
+log step: 156/260
+LR: 8.220969174925925e-05, Loss: 0.05009390299136822,                             Time:  0.00 h  19.79 min
+measuring validation accuracy
+06/16/2024 23:50:39 - INFO - __main__ - iter 162. mmlu val accuracy: 0.8571
+CUDA mem allocated: 12.367172718048096 GB
+CUDA mem reserved: 14.181640625 GB
+log step: 169/260
+LR: 6.694905705524112e-05, Loss: 0.022492296420610867,                             Time:  0.00 h  21.44 min
+log step: 182/260
+LR: 5.256000122354158e-05, Loss: 0.020553185389592096,                             Time:  0.00 h  23.07 min
+measuring validation accuracy
+06/16/2024 23:57:26 - INFO - __main__ - iter 189. mmlu val accuracy: 0.8718
+CUDA mem allocated: 12.367172718048096 GB
+CUDA mem reserved: 14.181640625 GB
+log step: 195/260
+LR: 3.94108311445741e-05, Loss: 0.020480032150561992,                             Time:  0.00 h  24.70 min
+processed 463.57880095341505 token/sec
+measuring test accuracy
+1000/ 14042 inputs processed
+2000/ 14042 inputs processed
+3000/ 14042 inputs processed
+4000/ 14042 inputs processed
+5000/ 14042 inputs processed
+6000/ 14042 inputs processed
+7000/ 14042 inputs processed
+06/17/2024 00:29:40 - INFO - __main__ - mmlu test accuracy after epoch 2: 0.6445
+CUDA mem allocated: 12.367172718048096 GB
+CUDA mem reserved: 14.181640625 GB
+log step: 208/260
+LR: 2.783811719515476e-05, Loss: 0.017872869968414307,                             Time:  0.00 h  26.38 min
+measuring validation accuracy
+06/17/2024 00:35:33 - INFO - __main__ - iter 216. mmlu val accuracy: 0.8844
+CUDA mem allocated: 12.367172718048096 GB
+CUDA mem reserved: 14.181640625 GB
+log step: 221/260
+LR: 1.8138078275134206e-05, Loss: 0.021549788805154655,                             Time:  0.00 h  28.04 min
+log step: 234/260
+LR: 1.0558999693382504e-05, Loss: 0.0014988377403754455,                             Time:  0.00 h  29.66 min
+measuring validation accuracy
+06/17/2024 00:42:19 - INFO - __main__ - iter 243. mmlu val accuracy: 0.8860
+CUDA mem allocated: 12.367172718048096 GB
+CUDA mem reserved: 14.181640625 GB
+log step: 247/260
+LR: 5.294877977350445e-06, Loss: 0.003125135715191181,                             Time:  0.00 h  31.30 min
+log step: 260/260
+LR: 2.4804552757006215e-06, Loss: 0.017893869143265944,                             Time:  0.00 h  32.94 min
+processed 745.0573754152553 token/sec
+measuring test accuracy
+1000/ 14042 inputs processed
+2000/ 14042 inputs processed
+3000/ 14042 inputs processed
+4000/ 14042 inputs processed
+5000/ 14042 inputs processed
+6000/ 14042 inputs processed
+7000/ 14042 inputs processed
+06/17/2024 01:16:10 - INFO - __main__ - mmlu test accuracy after epoch 3: 0.6483
+CUDA mem allocated: 12.367172718048096 GB
+CUDA mem reserved: 14.181640625 GB

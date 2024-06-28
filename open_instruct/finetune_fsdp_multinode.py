@@ -206,7 +206,7 @@ def parse_args():
         choices=[
             "linear",
             "cosine",
-            "cosine_with_restarts",
+            "cosine_with_restartss,
             "polynomial",
             "constant",
             "constant_with_warmup",
@@ -854,7 +854,7 @@ def main():
     logger.info(f"  Lora Alpha = {args.lora_alpha}")
     logger.info(f"  Lora Dropout = {args.lora_dropout}")
     logger.info(f"  Use Dora = {args.use_dora}")
-    logger.info(f"  Use rslora = {args.rs_lora}")
+    logger.info(f"  Use rslora = {args.use_rslora}")
     logger.info(f"  Batch size per device = {args.per_device_train_batch_size}")
     logger.info(
         f"  Total batch size (w. parallel, distributed & accumulation) = {args.batch_size}"
