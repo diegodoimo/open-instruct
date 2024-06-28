@@ -783,6 +783,16 @@ class MMLU_Dataset:
             tokenized_dataset, self.max_seq_len
         )
 
+        counts = Counter(tokenized_dataset["subject"])
+        # sum of the weights must give the number of classes to be consistent with the unifom case
+        weights = {
+            key: len(tokenized_dataset) / (len(counts) * count)
+            for key, count in counts.items()
+        }
+        tokenized_dataset["sample_weight"] = [
+            weights[sub] for sub in tokenized_dataset["subject"]
+        ]
+
         return tokenized_dataset, longest_sequences
 
 

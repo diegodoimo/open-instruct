@@ -398,6 +398,25 @@ def find_grad_accumulation_steps(args):
     return gradient_accumulation_steps, args.batch_size
 
 
+def compute_weighted_ce(logits, labels, weights, vocab_size):
+    # Shift so that tokens < n predict n
+    shift_logits = logits[..., :-1, :].contiguous()
+    shift_labels = labels[..., 1:].contiguous()
+
+    loss_fct = torch.nn.CrossEntropyLoss(reduction=None)
+    # Flatten the tokens
+    shift_logits = shift_logits.view(-1, vocab_size)
+    shift_labels = shift_labels.view(-1)
+    # Enable model parallelism
+    # shift_labels = shift_labels.to(shift_logits.device)
+    loss = loss_fct(shift_logits, shift_labels)
+
+    # here we prefer to leave the magnitude of the average batch loss relatively
+    # constant rather than enforcinf the exact global sample weights
+    weighted_loss = (loss * weights / weights.sum()).sum()
+    return weighted_loss
+
+
 def main():
     args = parse_args()
 
@@ -605,13 +624,15 @@ def main():
     assert args.per_device_eval_batch_size == 1
 
     # # DataLoaders creation:
-    train_loader = get_dataloader(
+    train_loader, sampler = get_dataloader(
         dataset=train_dataset,
         batch_size=args.per_device_train_batch_size,
         pad_token_id=tokenizer.pad_token_id,
         world_size=world_size,
         shuffle=True,
         num_processes=6,
+        weight_samples=args.weight_samples,
+        return_sampler=True,
     )
 
     val_loader = get_dataloader(
@@ -854,13 +875,25 @@ def main():
         num_tokens = 0
         # gradient accumulation step may not finish with a proper update at the end of the epoch so we call zero grad here
         optimizer.zero_grad()
+        if WORLD_SIZE > 1:
+            sampler.set_epoch(epoch)
         for index, batch in enumerate(train_loader):
 
             if WORLD_SIZE == 1:
                 # NO FSDP
                 batch = {key: val.to("cuda") for key, val in batch.items()}
-                outputs = model(**batch, use_cache=False)
-                loss = outputs.loss
+                # outputs = model(**batch, use_cache=False)
+                # loss = outputs.loss
+                outputs = model(
+                    input_ids=batch["input_ids"], attention_mask=batch["attention_mask"]
+                )
+                loss = compute_weighted_ce(
+                    logits=outputs.logits,
+                    labels=batch["labels"],
+                    weight=batch["weight"],
+                    vocab_size=model.config.vocab_size,
+                )
+
                 loss = loss / gradient_accumulation_steps
                 loss.backward()
                 total_loss += loss.detach().float()
