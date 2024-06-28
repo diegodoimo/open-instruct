@@ -18,6 +18,8 @@ export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 TOTAL_BATCH_SIZE=16
 BATCH_SIZE_PER_GPU=1
 
+
+samples_per_subject=40
 model_name="llama-3-8b"
 folder="llama_v3"
 
@@ -60,7 +62,7 @@ srun torchrun \
     --num_train_epochs 4 \
     --output_dir "./results/fsdp_test/${model_name}/" \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
-    --samples_per_subject 20 \
+    --samples_per_subject $samples_per_subject \
     --out_filename ""  \
     --checkpointing_steps 10 \
     --logging_steps 20 \
