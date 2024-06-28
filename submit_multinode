@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=DGX
 #SBATCH --account=lade
-#SBATCH --nodelist=dgx002
+##SBATCH --nodelist=dgx002
 #SBATCH --nodes=1
 #SBATCH --time=20:00:00            
 #SBATCH --ntasks-per-node=1       
@@ -19,6 +19,7 @@ TOTAL_BATCH_SIZE=16
 BATCH_SIZE_PER_GPU=1
 
 model_name="llama-3-70b"
+samples_per_subject=40
 folder="llama_v3"
 
 #model_name="mistral-1-7b"
@@ -60,7 +61,7 @@ srun torchrun \
     --num_train_epochs 4 \
     --output_dir "./results/fsdp_test/${model_name}/" \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
-    --samples_per_subject 20 \
+    --samples_per_subject $samples_per_subject \
     --out_filename ""  \
     --checkpointing_steps 10 \
     --logging_steps 20 \

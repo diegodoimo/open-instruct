@@ -12,6 +12,7 @@ from .encoding_helpers import (
 )
 from datasets.utils.logging import disable_progress_bar
 import sys
+import matplotlib.pyplot as plt
 
 import numpy as np
 from datasets import load_dataset, concatenate_datasets
