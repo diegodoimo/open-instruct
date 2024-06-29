@@ -20,13 +20,17 @@ def get_model_hf(
     low_cpu_mem_usage,
     accelerator,
     use_flash_attention_2=False,
+    activation_checkpointing=False,
 ):
 
     if model_name_or_path:
         config = AutoConfig.from_pretrained(model_name_or_path)
         accelerator.print("model_loading started. \n\n")
         sys.stdout.flush()
-        config.use_cache = False
+        if activation_checkpointing:
+            config.use_cache = False
+            # by default is true: about use cache
+            # https://github.com/huggingface/transformers/issues/28499
         model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path,
             from_tf=bool(".ckpt" in model_name_or_path),
@@ -36,9 +40,7 @@ def get_model_hf(
             use_flash_attention_2=use_flash_attention_2,
         )
 
-        assert model.config.use_cache == False
-        # about use cache
-        # https://github.com/huggingface/transformers/issues/28499
+        # assert model.config.use_cache == False
 
     else:
         warnings.warn("Using a fake llama for debugging\n", stacklevel=2)

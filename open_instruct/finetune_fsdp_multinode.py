@@ -410,6 +410,7 @@ def compute_weighted_ce(logits, labels, weights, vocab_size):
 
     # here we prefer to leave the magnitude of the average batch loss relatively
     # constant rather than enforcinf the exact global sample weights
+    # weighted average instead of plain averge:
     weighted_loss = (loss * weights / weights.sum()).sum()
     return weighted_loss
 
@@ -499,14 +500,14 @@ def main():
         precision=torch.bfloat16,
         use_flash_attention_2=args.use_flash_attn,
     )
-    
-    all_attributes = dir(model)
-    
-    # Filter out special methods and attributes
-    #filtered_attributes = [attr for attr in all_attributes if not attr.startswith('__')]
 
-    #print("Attributes of MyClass:")
-    #for attr in filtered_attributes:
+    all_attributes = dir(model)
+
+    # Filter out special methods and attributes
+    # filtered_attributes = [attr for attr in all_attributes if not attr.startswith('__')]
+
+    # print("Attributes of MyClass:")
+    # for attr in filtered_attributes:
     #    print(attr)
 
     if args.use_lora:
@@ -874,7 +875,7 @@ def main():
     completed_steps = 0
     total_loss = 0
     total_time = 0
-    
+
     print(model.use_cache)
     for epoch in range(args.num_train_epochs):
         model.train()
