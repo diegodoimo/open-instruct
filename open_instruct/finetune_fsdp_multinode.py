@@ -875,8 +875,12 @@ def main():
     completed_steps = 0
     total_loss = 0
     total_time = 0
+<<<<<<< HEAD
 
     print(model.use_cache)
+=======
+    
+>>>>>>> dfbad911fa1b5f16478438a0fe11be01c1ab761a
     for epoch in range(args.num_train_epochs):
         model.train()
         start = time.time()
