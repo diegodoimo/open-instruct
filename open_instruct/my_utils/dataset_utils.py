@@ -790,7 +790,7 @@ class MMLU_Dataset:
             for key, count in counts.items()
         }
         tokenized_dataset = tokenized_dataset.add_column(
-            "sample_weight", [weights[sub] for sub in tokenized_dataset["subject"]]
+            "sample_weight", [[weights[sub]] for sub in tokenized_dataset["subject"]]
         )
 
         return tokenized_dataset, longest_sequences
