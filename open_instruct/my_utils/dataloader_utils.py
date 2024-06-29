@@ -21,10 +21,11 @@ def get_dataloader(
     return_sampler=False,
     weight_samples=False,
 ):
-    if collate_fn is None:
-        collate_fn = DataCollatorForCausalLM(pad_token_id=pad_token_id)
-    elif weight_samples:
+
+    if weight_samples:
         collate_fn = WeightedDataCollatorForCausalLM(pad_token_id=pad_token_id)
+    elif collate_fn is None:
+        collate_fn = DataCollatorForCausalLM(pad_token_id=pad_token_id)
 
     if world_size > 1:
         sampler = DistributedSampler(dataset, shuffle=shuffle, drop_last=drop_last)
