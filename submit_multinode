@@ -12,7 +12,7 @@
 
 source /u/area/ddoimo/anaconda3/bin/activate ./env_amd_new
 
-export OMP_NUM_THREADS=128
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True" 
 
 TOTAL_BATCH_SIZE=16
@@ -33,7 +33,7 @@ head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
 srun torchrun \
     --nnodes=$SLURM_NTASKS \
     --node-rank=$SLURM_NODEID \
-    --nproc-per-node=1 \
+    --nproc-per-node=$SLURM_GPUS \
     --rdzv-id=$SLURM_PROCID \
     --rdzv-backend=c10d \
     --rdzv-endpoint=$head_node:0 \
