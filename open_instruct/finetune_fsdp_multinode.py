@@ -875,7 +875,6 @@ def main():
     total_loss = 0
     total_time = 0
     
-    print(model.use_cache)
     for epoch in range(args.num_train_epochs):
         model.train()
         start = time.time()
