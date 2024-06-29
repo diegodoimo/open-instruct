@@ -400,7 +400,7 @@ def compute_weighted_ce(logits, labels, weights, vocab_size):
     shift_logits = logits[..., :-1, :].contiguous()
     shift_labels = labels[..., 1:].contiguous()
 
-    loss_fct = torch.nn.CrossEntropyLoss(reduction=None)
+    loss_fct = torch.nn.CrossEntropyLoss(reduction="none")
     # Flatten the tokens
     shift_logits = shift_logits.view(-1, vocab_size)
     shift_labels = shift_labels.view(-1)
@@ -919,7 +919,7 @@ def main():
                     loss = compute_weighted_ce(
                         logits=outputs.logits,
                         labels=batch["labels"],
-                        weight=batch["weight"],
+                        weights=batch["weight"],
                         vocab_size=model.config.vocab_size,
                     )
 
@@ -950,7 +950,7 @@ def main():
                         loss = compute_weighted_ce(
                             logits=outputs.logits,
                             labels=batch["labels"],
-                            weight=batch["weight"],
+                            weights=batch["weight"],
                             vocab_size=model.config.vocab_size,
                         )
 

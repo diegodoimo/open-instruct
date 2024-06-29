@@ -792,6 +792,7 @@ class MMLU_Dataset:
         tokenized_dataset = tokenized_dataset.add_column(
             "sample_weight", [[weights[sub]] for sub in tokenized_dataset["subject"]]
         )
+        tokenized_dataset.set_format(type="pt")
 
         return tokenized_dataset, longest_sequences
 
