@@ -36,7 +36,7 @@ def get_model_hf(
             use_flash_attention_2=use_flash_attention_2,
         )
 
-        assert model.use_cache == False
+        assert model.config.use_cache == False
         # about use cache
         # https://github.com/huggingface/transformers/issues/28499
 
