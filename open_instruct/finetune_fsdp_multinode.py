@@ -405,9 +405,10 @@ def compute_weighted_ce(logits, labels, weights, vocab_size):
     shift_logits = shift_logits.view(-1, vocab_size)
     shift_labels = shift_labels.view(-1)
     # Enable model parallelism
-    # shift_labels = shift_labels.to(shift_logits.device)
+    shift_labels = shift_labels.to(shift_logits.device)
     loss = loss_fct(shift_logits, shift_labels)
 
+    weights = weights.to(shift_logits.device)
     # here we prefer to leave the magnitude of the average batch loss relatively
     # constant rather than enforcinf the exact global sample weights
     # weighted average instead of plain averge:
@@ -875,12 +876,6 @@ def main():
     completed_steps = 0
     total_loss = 0
     total_time = 0
-<<<<<<< HEAD
-
-    print(model.use_cache)
-=======
-    
->>>>>>> dfbad911fa1b5f16478438a0fe11be01c1ab761a
     for epoch in range(args.num_train_epochs):
         model.train()
         start = time.time()
