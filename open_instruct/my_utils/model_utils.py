@@ -14,8 +14,6 @@ wd = Path(__file__).parent.parent.resolve()
 sys.path.append(str(wd))
 
 
-
-
 def get_model_hf(
     model_name_or_path,
     precision,
@@ -35,8 +33,10 @@ def get_model_hf(
             low_cpu_mem_usage=low_cpu_mem_usage,
             torch_dtype=precision,
             use_flash_attention_2=use_flash_attention_2,
+            use_cache=False,
         )
-
+        # about use cache
+        # https://github.com/huggingface/transformers/issues/28499
     else:
         warnings.warn("Using a fake llama for debugging\n", stacklevel=2)
         config = LlamaConfig()
