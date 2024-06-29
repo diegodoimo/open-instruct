@@ -695,7 +695,7 @@ def main():
         apply_activation_checkpointing(
             model, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=check_fn
         )
-        model.use_cache = False
+        assert model.use_cache == False
         # about use cache
         # https://github.com/huggingface/transformers/issues/28499
 

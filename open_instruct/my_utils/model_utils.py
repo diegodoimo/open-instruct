@@ -26,6 +26,7 @@ def get_model_hf(
         config = AutoConfig.from_pretrained(model_name_or_path)
         accelerator.print("model_loading started. \n\n")
         sys.stdout.flush()
+        config.use_cache = False
         model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path,
             from_tf=bool(".ckpt" in model_name_or_path),
