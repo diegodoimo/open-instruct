@@ -39,8 +39,8 @@ def get_model_hf(
             torch_dtype=precision,
             use_flash_attention_2=use_flash_attention_2,
         )
-
-        # assert model.config.use_cache == False
+        if activation_checkpointing:
+            assert model.config.use_cache == False
 
     else:
         warnings.warn("Using a fake llama for debugging\n", stacklevel=2)

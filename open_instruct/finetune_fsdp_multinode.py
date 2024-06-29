@@ -405,9 +405,10 @@ def compute_weighted_ce(logits, labels, weights, vocab_size):
     shift_logits = shift_logits.view(-1, vocab_size)
     shift_labels = shift_labels.view(-1)
     # Enable model parallelism
-    # shift_labels = shift_labels.to(shift_logits.device)
+    shift_labels = shift_labels.to(shift_logits.device)
     loss = loss_fct(shift_logits, shift_labels)
 
+    weights = weights.to(shift_logits.device)
     # here we prefer to leave the magnitude of the average batch loss relatively
     # constant rather than enforcinf the exact global sample weights
     # weighted average instead of plain averge:
@@ -499,6 +500,7 @@ def main():
         low_cpu_mem_usage=args.low_cpu_mem_usage,
         precision=torch.bfloat16,
         use_flash_attention_2=args.use_flash_attn,
+        activation_checkpointing=args.activation_checkpointing,
     )
 
     all_attributes = dir(model)
