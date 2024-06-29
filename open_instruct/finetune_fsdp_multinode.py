@@ -500,6 +500,7 @@ def main():
         low_cpu_mem_usage=args.low_cpu_mem_usage,
         precision=torch.bfloat16,
         use_flash_attention_2=args.use_flash_attn,
+        activation_checkpointing=args.activation_checkpointing
     )
 
     all_attributes = dir(model)
