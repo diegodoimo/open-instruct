@@ -206,7 +206,7 @@ def parse_args():
         choices=[
             "linear",
             "cosine",
-            "cosine_with_restartss,
+            "cosine_with_restarts",
             "polynomial",
             "constant",
             "constant_with_warmup",
@@ -912,8 +912,20 @@ def main():
                     # # fsdp wrapper automatically puts the tensor to gpu device
                     num_tokens += batch["input_ids"].numel()
 
-                    outputs = model(**batch, use_cache=False)
-                    loss = outputs.loss
+                    # outputs = model(**batch, use_cache=False)
+                    # loss = outputs.loss
+
+                    outputs = model(
+                        input_ids=batch["input_ids"],
+                        attention_mask=batch["attention_mask"],
+                    )
+                    loss = compute_weighted_ce(
+                        logits=outputs.logits,
+                        labels=batch["labels"],
+                        weight=batch["weight"],
+                        vocab_size=model.config.vocab_size,
+                    )
+
                     loss = loss / gradient_accumulation_steps
                     loss.backward()
                     total_loss += loss.detach().float()
@@ -930,8 +942,21 @@ def main():
                     with model.no_sync():
                         # 1 forward and 1 backward must be inside the context manager
                         num_tokens += batch["input_ids"].numel()
-                        outputs = model(**batch, use_cache=False)
-                        loss = outputs.loss
+
+                        # outputs = model(**batch, use_cache=False)
+                        # loss = outputs.loss
+
+                        outputs = model(
+                            input_ids=batch["input_ids"],
+                            attention_mask=batch["attention_mask"],
+                        )
+                        loss = compute_weighted_ce(
+                            logits=outputs.logits,
+                            labels=batch["labels"],
+                            weight=batch["weight"],
+                            vocab_size=model.config.vocab_size,
+                        )
+
                         loss = loss / gradient_accumulation_steps
                         # no need for grad scaler
                         loss.backward()
