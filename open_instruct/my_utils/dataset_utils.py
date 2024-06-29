@@ -789,7 +789,7 @@ class MMLU_Dataset:
             key: len(tokenized_dataset) / (len(counts) * count)
             for key, count in counts.items()
         }
-        tokenized_dataset.add_column(
+        tokenized_dataset = tokenized_dataset.add_column(
             "sample_weight", [weights[sub] for sub in tokenized_dataset["subject"]]
         )
 

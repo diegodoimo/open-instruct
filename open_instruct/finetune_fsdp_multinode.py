@@ -354,7 +354,6 @@ def parse_args():
     )
     parser.add_argument("--clip_grad_thresh", type=float, default=1.0)
     parser.add_argument("--lr_min_fact", type=float, default=0.01)
-
     parser.add_argument("--overlap_base_dir", type=str, default=None, help="")
     parser.add_argument("--save_checkpoint", action="store_true")
     parser.add_argument("--eval_only", action="store_true")
