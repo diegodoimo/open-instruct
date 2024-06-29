@@ -887,7 +887,7 @@ def main():
                 loss = compute_weighted_ce(
                     logits=outputs.logits,
                     labels=batch["labels"],
-                    weight=batch["weight"],
+                    weights=batch["weight"],
                     vocab_size=model.config.vocab_size,
                 )
 
