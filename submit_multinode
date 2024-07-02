@@ -30,22 +30,19 @@ nodes_array=($nodes)
 head_node=${nodes_array[0]}
 head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
 
+# for some reason the $SLURM_GPUS is empty. We use another way to count the gpus per node used below. 
 srun torchrun \
     --nnodes=$SLURM_NTASKS \
     --node-rank=$SLURM_NODEID \
-<<<<<<< HEAD
-    --nproc-per-node=$SLURM_GPUS \
-=======
-    --nproc-per-node=8 \
->>>>>>> a465bb0265f1e52953613fa4f4b05757ba031293
+    --nproc-per-node=$(echo $CUDA_VISIBLE_DEVICES | tr ',' ' ' | wc -w) \
     --rdzv-id=$SLURM_PROCID \
     --rdzv-backend=c10d \
     --rdzv-endpoint=$head_node:0 \
    open_instruct/finetune_fsdp_multinode.py \
     --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
     --use_lora \
-    --lora_rank 64 \
-    --lora_alpha 16 \
+    --lora_rank 256 \
+    --lora_alpha 128 \
     --lora_dropout 0.1 \
     --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
     --use_slow_tokenizer \
@@ -58,10 +55,10 @@ srun torchrun \
     --preprocessing_num_workers 16 \
     --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 1 \
-    --learning_rate 2e-4 \
+    --learning_rate 1e-4 \
     --lr_scheduler_type cosine \
     --warmup_ratio 0.05 \
-    --weight_decay 1e-5  \
+    --weight_decay 0.0  \
     --num_train_epochs 4 \
     --output_dir "./results/fsdp_test/${model_name}/" \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
