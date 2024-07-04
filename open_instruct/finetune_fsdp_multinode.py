@@ -487,7 +487,7 @@ def main():
 
         args.output_dir += f"/{args.num_train_epochs}epochs"
         if args.seed is not None:
-            args.output_dir += f"+=_seed{args.seed}"
+            args.output_dir += f"_seed{args.seed}"
         os.makedirs(args.output_dir, exist_ok=True)
 
     accelerator.wait_for_everyone()
