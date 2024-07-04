@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=DGX
 #SBATCH --account=lade
-#SBATCH --nodelist=dgx002
+#SBATCH --nodelist=dgx001
 #SBATCH --nodes=1
 #SBATCH --time=20:00:00            
 #SBATCH --ntasks-per-node=1       
@@ -19,7 +19,7 @@ TOTAL_BATCH_SIZE=16
 BATCH_SIZE_PER_GPU=1
 
 model_name="llama-3-70b"
-samples_per_subject=40
+samples_per_subject=20
 folder="llama_v3"
 
 #model_name="mistral-1-7b"
@@ -41,8 +41,8 @@ srun torchrun \
    open_instruct/finetune_fsdp_multinode.py \
     --model_name_or_path  /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
     --use_lora \
-    --lora_rank 256 \
-    --lora_alpha 128 \
+    --lora_rank 128 \
+    --lora_alpha 32 \
     --lora_dropout 0.1 \
     --tokenizer_name /orfeo/cephfs/scratch/area/ddoimo/models/$folder/models_hf/$model_name \
     --use_slow_tokenizer \
@@ -60,7 +60,7 @@ srun torchrun \
     --warmup_ratio 0.05 \
     --weight_decay 0.0  \
     --num_train_epochs 4 \
-    --output_dir "./results/fsdp_test/${model_name}/" \
+    --output_dir "./results/${model_name}/" \
     --overlap_base_dir "/u/area/ddoimo/ddoimo/open/geometric_lens/repo/results/validation/$model_name" \
     --samples_per_subject $samples_per_subject \
     --out_filename ""  \
@@ -70,6 +70,8 @@ srun torchrun \
     --use_flash_attn \
     --activation_checkpointing \
     --weight_samples \
+    --save_checkpoint \
+    --seed 2 
     #--measure_baselines \
     #--use_dora \
     #--save_checkpoint

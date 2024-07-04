@@ -486,6 +486,8 @@ def main():
             args.output_dir += f"_{args.samples_per_subject}samples"
 
         args.output_dir += f"/{args.num_train_epochs}epochs"
+        if args.seed is not None:
+            args.output_dir += f"+=_seed{args.seed}"
         os.makedirs(args.output_dir, exist_ok=True)
 
     accelerator.wait_for_everyone()
@@ -502,15 +504,6 @@ def main():
         use_flash_attention_2=args.use_flash_attn,
         activation_checkpointing=args.activation_checkpointing,
     )
-
-    all_attributes = dir(model)
-
-    # Filter out special methods and attributes
-    # filtered_attributes = [attr for attr in all_attributes if not attr.startswith('__')]
-
-    # print("Attributes of MyClass:")
-    # for attr in filtered_attributes:
-    #    print(attr)
 
     if args.use_lora:
         from peft import LoraConfig, TaskType, get_peft_model
@@ -792,7 +785,7 @@ def main():
 
     eval_steps, _ = get_cpt_steps(args.eval_steps, args.max_train_steps, logspace=False)
     checkpointing_steps, _ = get_cpt_steps(
-        args.checkpointing_steps, args.max_train_steps, logspace=False
+        args.checkpointing_steps, args.max_train_steps, logspace=True
     )
     log_steps, log_interval = get_cpt_steps(
         args.logging_steps, args.max_train_steps, logspace=False
@@ -806,6 +799,7 @@ def main():
     stats["batch_size"] = args.batch_size
     stats["weight_decay"] = args.weight_decay
     stats["lora_rank"] = args.lora_rank
+    stats["lora_alpha"] = args.lora_rank
     stats["lora_dropout"] = args.lora_dropout
 
     meter = measure_statistics(
