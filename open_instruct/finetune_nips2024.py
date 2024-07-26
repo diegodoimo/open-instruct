@@ -862,8 +862,15 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
             for answer_choice in choices
         ]
 
+    fw_time = 0
+    post_proc = 0
+
+    start = time.time()
     for iter_num, batch in enumerate(dataloader):
-        if (iter_num + 1) % int(2000 / dataloader.batch_size) == 0:
+        post_proc = time.time() - start
+
+        start = time.time()
+        if (iter_num + 1) % int(1000 / dataloader.batch_size) == 0:
             print(
                 f"{iter_num * dataloader.batch_size+1}/ {len(dataloader.dataset)} inputs processed"
             )
@@ -877,6 +884,9 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         input_ids = input_ids.to("cuda")
         outputs = model(input_ids)
         logits = outputs.logits
+        fw_time += time.time() - start
+        
+        start = time.time()
 
         seq_len = torch.sum(mask, dim=1)
         batch_probs = torch.softmax(
@@ -887,7 +897,6 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         batch_prediction_indices = torch.argmax(batch_probs, dim=-1)
         predictions += batch_prediction_indices.tolist()
         ground_truths += tokenizer.batch_decode(targets, skip_special_tokens=True)
-
     # assert len(predictions) == len(
     #     dataloader.dataset
     # ), "number of predictions should be equal to number of prompts"
@@ -902,6 +911,12 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
     # acc = np.mean(cors)
     # model.train()
 
+    post_proc += time.time() - start
+
+        
+
+    start = time.time()
+
     predictions = torch.tensor(predictions)
     predictions = np.array([tokenizer.decode(pred).strip() for pred in predictions])
 
@@ -915,6 +930,10 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         answers[: len(predictions)],
         np.array(subjects[: len(predictions)]),
     )
+    
+    print("end operations: ", time.time() - start)
+    print("post_proc: ", post_proc)
+    print("fw_time: ", fw_time)
 
     return acc_pred["macro"]
 
