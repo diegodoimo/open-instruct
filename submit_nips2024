@@ -22,8 +22,8 @@ TOTAL_BATCH_SIZE=16
 BATCH_SIZE_PER_GPU=1
 GRADIENT_ACC_STEPS=$(($TOTAL_BATCH_SIZE/$NUM_GPUS/$BATCH_SIZE_PER_GPU))
 
-model_name="llama-2-7b"
-folder="llama_v2"
+model_name="llama-3-8b"
+folder="llama_v3"
 
 # Lora training
 #torchrun --rdzv-backend=c10d --rdzv-endpoint=localhost:0 \
