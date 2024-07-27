@@ -740,6 +740,7 @@ def main():
     print_memory_consumed()
     accelerator.print("before train run")
     sys.stdout.flush()
+    assert False
 
     steps_to_save = 20
     eval_steps = np.unique(
@@ -822,6 +823,7 @@ def main():
                     if args.output_dir is not None:
                         output_dir = os.path.join(args.output_dir, output_dir)
                     save_with_accelerate(accelerator, model, output_dir, args)
+                    accelerator.print("saving finished")
 
                 if completed_steps >= args.max_train_steps:
                     break
@@ -869,58 +871,50 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
     start = time.time()
     for iter_num, batch in enumerate(dataloader):
-        post_proc = time.time() - start
+        if iter_num < 100:
+            post_proc = time.time() - start
 
-        start = time.time()
-        if (iter_num + 1) % int(1000 / dataloader.batch_size) == 0:
-            print(
-                f"{iter_num * dataloader.batch_size+1}/ {len(dataloader.dataset)} inputs processed"
+            start = time.time()
+            if (iter_num + 1) % int(1000 / dataloader.batch_size) == 0:
+                print(
+                    f"{iter_num * dataloader.batch_size+1}/ {len(dataloader.dataset)} inputs processed"
+                )
+                sys.stdout.flush()
+
+            input_ids, targets, mask = (
+                batch["input_ids"],
+                batch["labels"],
+                batch["attention_mask"],
             )
-            sys.stdout.flush()
+            input_ids = input_ids.to("cuda")
+            outputs = model(input_ids)
+            logits = outputs.logits
+            fw_time += time.time() - start
 
-        input_ids, targets, mask = (
-            batch["input_ids"],
-            batch["labels"],
-            batch["attention_mask"],
-        )
-        input_ids = input_ids.to("cuda")
-        outputs = model(input_ids)
-        logits = outputs.logits
+            start = time.time()
 
-        fw_time += time.time() - start        
-        start = time.time()
+            seq_len = torch.sum(mask, dim=1)
+            batch_probs = torch.softmax(
+                logits[torch.arange(input_ids.shape[0]), seq_len - 1, :], dim=-1
+            )
+            # if candidate_token_ids is not None:
+            #     batch_probs = batch_probs[:, candidate_token_ids]
+            batch_prediction_indices = torch.argmax(batch_probs, dim=-1)
+            predictions += batch_prediction_indices.tolist()
+            ground_truths += tokenizer.batch_decode(targets, skip_special_tokens=True)
+        # assert len(predictions) == len(
+        #     dataloader.dataset
+        # ), "number of predictions should be equal to number of prompts"
 
-        seq_len = torch.sum(mask, dim=1)
-        batch_probs = torch.softmax(
-            logits[torch.arange(input_ids.shape[0]), seq_len - 1, :], dim=-1
-        )
-        # if candidate_token_ids is not None:
-        #     batch_probs = batch_probs[:, candidate_token_ids]
-        batch_prediction_indices = torch.argmax(batch_probs, dim=-1)
-       
+        # # get the metrics
+        # cors = []
+        # for i in range(len(predictions)):
+        #     prediction = choices[predictions[i]]
+        #     ground_truth = ground_truths[i]
+        #     cors.append(prediction == ground_truth)
 
-
-        post1 += time.time() - start        
-        start = time.time()
-
-        predictions += batch_prediction_indices.tolist()
-        ground_truths += tokenizer.batch_decode(targets, skip_special_tokens=True)
-        
-        post2 += time.time() - start        
-        start = time.time()
-    # assert len(predictions) == len(
-    #     dataloader.dataset
-    # ), "number of predictions should be equal to number of prompts"
-
-    # # get the metrics
-    # cors = []
-    # for i in range(len(predictions)):
-    #     prediction = choices[predictions[i]]
-    #     ground_truth = ground_truths[i]
-    #     cors.append(prediction == ground_truth)
-
-    # acc = np.mean(cors)
-    # model.train()
+        # acc = np.mean(cors)
+        # model.train()
 
     post_proc += time.time() - start
     start = time.time()
@@ -938,7 +932,7 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         answers[: len(predictions)],
         np.array(subjects[: len(predictions)]),
     )
-    
+
     print("end operations: ", time.time() - start)
     print("post_proc: ", post_proc)
     print("post1: ", post1)
