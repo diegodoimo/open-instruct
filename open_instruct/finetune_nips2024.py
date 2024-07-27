@@ -864,6 +864,8 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
 
     fw_time = 0
     post_proc = 0
+    post1 = 0
+    post2 = 0
 
     start = time.time()
     for iter_num, batch in enumerate(dataloader):
@@ -884,8 +886,8 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         input_ids = input_ids.to("cuda")
         outputs = model(input_ids)
         logits = outputs.logits
-        fw_time += time.time() - start
-        
+
+        fw_time += time.time() - start        
         start = time.time()
 
         seq_len = torch.sum(mask, dim=1)
@@ -895,8 +897,17 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         # if candidate_token_ids is not None:
         #     batch_probs = batch_probs[:, candidate_token_ids]
         batch_prediction_indices = torch.argmax(batch_probs, dim=-1)
+       
+
+
+        post1 += time.time() - start        
+        start = time.time()
+
         predictions += batch_prediction_indices.tolist()
         ground_truths += tokenizer.batch_decode(targets, skip_special_tokens=True)
+        
+        post2 += time.time() - start        
+        start = time.time()
     # assert len(predictions) == len(
     #     dataloader.dataset
     # ), "number of predictions should be equal to number of prompts"
@@ -912,9 +923,6 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
     # model.train()
 
     post_proc += time.time() - start
-
-        
-
     start = time.time()
 
     predictions = torch.tensor(predictions)
@@ -933,6 +941,8 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
     
     print("end operations: ", time.time() - start)
     print("post_proc: ", post_proc)
+    print("post1: ", post1)
+    print("post2: ", post2)
     print("fw_time: ", fw_time)
 
     return acc_pred["macro"]
