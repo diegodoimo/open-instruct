@@ -1139,6 +1139,7 @@ def evaluate(model, dataloader, tokenizer):
     subjects = subjects.cpu().numpy()
 
     acc_pred = compute_accuracy(predictions, ground_truths, subjects)
+    model.train()
 
     return acc_pred
 
