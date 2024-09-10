@@ -17,6 +17,7 @@ accelerate launch \
     --lora_rank 64 \
     --lora_alpha 16 \
     --lora_dropout 0.1 \
+    --model_
     --tokenizer_name /home/diego/area_science/ricerca/llama_analysis/hf_llama \
     --use_slow_tokenizer \
     --train_file "/home/diego/area_science/ricerca/data/open_instruct/processed/lima/lima_data.jsonl" \

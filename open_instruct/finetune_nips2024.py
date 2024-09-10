@@ -915,6 +915,7 @@ def evaluate(model, dataloader, tokenizer, restrict_targets):
         answers[: len(predictions)],
         np.array(subjects[: len(predictions)]),
     )
+    model.train()
 
     return acc_pred["macro"]
 
